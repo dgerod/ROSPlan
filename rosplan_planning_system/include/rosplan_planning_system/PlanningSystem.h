@@ -21,6 +21,7 @@
 #include "CFFPlanParser.h"
 #include "CLGPlanParser.h"
 #include "FFPlanParser.h"
+#include "FFPlanParserForEsterel.h"
 
 #include "PlanDispatcher.h"
 #include "SimplePlanDispatcher.h"
@@ -75,14 +76,13 @@ namespace KCL_rosplan {
                 command = other.command;            
                 return *this;
             }
-
             
             PlanParser* parser;
             PlanDispatcher* dispatcher;
             std::string command;            
         };        
         std::map<std::string, PlannerInfo> planner_list;		
-        
+                
 		/* planning */
 		actionlib::SimpleActionServer<rosplan_dispatch_msgs::PlanAction>* plan_server;
 		double mission_start_time;
@@ -116,8 +116,7 @@ namespace KCL_rosplan {
 		/* problem generation */
 		bool runProblemServerParams(rosplan_dispatch_msgs::PlanningService::Request &req, rosplan_dispatch_msgs::PlanningService::Response &res);
 		bool runProblemServer(std::string domainPath, std::string problemPath, std::string dataPath);
-
-		
+        
 		/* planning */
 		ros::ServiceClient generate_problem_client;
 		PDDLProblemGenerator pddl_problem_generator;		
@@ -128,9 +127,10 @@ namespace KCL_rosplan {
 		bool generatePDDLProblemFile(rosplan_knowledge_msgs::GenerateProblemService::Request &req, rosplan_knowledge_msgs::GenerateProblemService::Response &res);
 		void publishFilter();
 	
-		/* dispatch class */
+		/* plan dispatching */
 		PlanDispatcher* plan_dispatcher;
-
+        void actionFeedbackCallback(const rosplan_dispatch_msgs::ActionFeedback::ConstPtr& msg);
+        
 		/* ROS interface */
 		ros::Publisher filter_publisher;
 		ros::Publisher problem_publisher;

@@ -6,6 +6,8 @@
 #include <streambuf>
 #include <map>
 
+using KCL_rosplan::ff_esterel::FFPlanParserForEsterel;
+
 namespace KCL_rosplan {
 
 	/*-------------*/
@@ -18,15 +20,25 @@ namespace KCL_rosplan {
             plan_server(new actionlib::SimpleActionServer<rosplan_dispatch_msgs::PlanAction>(nh_, "/kcl_rosplan/start_planning", boost::bind(&PlanningSystem::runPlanningServerAction, this, _1), false))
     {
         // planners: command, parser and dispatcher.
-        planner_list["popf-esterel"] = PlannerInfo(new POPFEsterelPlanParser(nh), std::string("timeout 10 PLANNER_PATH/bin/popf -n DOMAIN PROBLEM"));
-        planner_list["popf-esterel"].dispatcher = new EsterelPlanDispatcher(*dynamic_cast<POPFEsterelPlanParser*>(planner_list["popf-esterel"].parser));
+        // -----------------------------------------------------
+        
+        // popf        
         planner_list["popf"] = PlannerInfo(new POPFPlanParser(), std::string("timeout 10 PLANNER_PATH/popf -n DOMAIN PROBLEM"));
         planner_list["popf"].dispatcher = new SimplePlanDispatcher();
+        // popf-esterel
+        planner_list["popf-esterel"] = PlannerInfo(new POPFEsterelPlanParser(nh), std::string("timeout 10 PLANNER_PATH/bin/popf -n DOMAIN PROBLEM"));
+        planner_list["popf-esterel"].dispatcher = new EsterelPlanDispatcher(*dynamic_cast<POPFEsterelPlanParser*>(planner_list["popf-esterel"].parser));
+        // ff
         planner_list["ff"] = PlannerInfo(new FFPlanParser(), std::string("timeout 10 PLANNER_PATH/ff -o DOMAIN -f PROBLEM"));
         planner_list["ff"].dispatcher = new SimplePlanDispatcher();
-                
+        // ff-esterel
+        planner_list["ff-esterel"] = PlannerInfo(new FFPlanParserForEsterel(), std::string("timeout 10 PLANNER_PATH/ff -o DOMAIN -f PROBLEM"));
+        planner_list["ff-esterel"].dispatcher = new EsterelPlanDispatcher(*dynamic_cast<FFPlanParserForEsterel*>(planner_list["ff-esterel"].parser));
+        
         // publishing "action_dispatch", "action_feedback" and add to the dispatchers
-      	ros::Publisher action_publisher;
+      	// -----------------------------------------------------
+        
+        ros::Publisher action_publisher;
 		ros::Publisher action_feedback_pub;
       
         action_publisher = nh.advertise<rosplan_dispatch_msgs::ActionDispatch>("/kcl_rosplan/action_dispatch", 1000, /* latch */ false);
@@ -46,11 +58,12 @@ namespace KCL_rosplan {
         // problem generation client
         generate_problem_client = nh.serviceClient<rosplan_knowledge_msgs::GenerateProblemService>("/kcl_rosplan/generate_planning_problem");
 
-        // default parser and dispatcher
+        // set default parser and dispatcher and start planning action server
+      	// -----------------------------------------------------
+        
         plan_parser =  planner_list["popf-esterel"].parser;
         plan_dispatcher = planner_list["popf-esterel"].dispatcher;
       
-        // start planning action server
         plan_server->start();
     }
 
@@ -65,7 +78,7 @@ namespace KCL_rosplan {
         planner_list.clear();
 
         delete plan_server;
-}
+    }
 
 	/**
 	 * Runs external commands
@@ -240,6 +253,16 @@ namespace KCL_rosplan {
 	/* Service and Action hooks */
 	/*--------------------------*/
 
+    void PlanningSystem::actionFeedbackCallback(const rosplan_dispatch_msgs::ActionFeedback::ConstPtr& msg)
+    {
+        ROS_INFO("KCL: (PS) Forward message to Planner Dispatcher");
+        std::map<std::string, PlannerInfo>::iterator it;
+        for(it = planner_list.begin(); it != planner_list.end(); it++) {
+            it->second.dispatcher->feedbackCallback(msg);
+        }        
+    }
+                
+        
 	/* planning system service method; loads parameters and calls method below */
 	bool PlanningSystem::runPlanningServerDefault(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
 
@@ -525,7 +548,7 @@ namespace KCL_rosplan {
 
 		KCL_rosplan::PlanningSystem planningSystem(nh);
 
-		ros::Subscriber feedback_sub = nh.subscribe("/kcl_rosplan/action_feedback", 10, &KCL_rosplan::PlanDispatcher::feedbackCallback, planningSystem.plan_dispatcher);
+		ros::Subscriber feedback_sub = nh.subscribe("/kcl_rosplan/action_feedback", 10, &KCL_rosplan::PlanningSystem::actionFeedbackCallback, &planningSystem);
 		ros::Subscriber command_sub = nh.subscribe("/kcl_rosplan/planning_commands", 10, &KCL_rosplan::PlanningSystem::commandCallback, &planningSystem);
 
 		// publishing "/kcl_rosplan/filter"; listening "/kcl_rosplan/notification"

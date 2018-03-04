@@ -87,6 +87,7 @@ set(PLANNING_SOURCES
 	src/PlanParsing/CLGPlanParser.cpp
 	src/PlanParsing/POPFEsterelPlanParser.cpp
 	src/PlanParsing/FFPlanParser.cpp
+	src/PlanParsing/FFPlanParserForEsterel.cpp
 	src/ProblemGeneration/PDDLProblemGenerator.cpp
 	src/PlanningEnvironment.cpp
 	src/EsterelPlan.cpp)
@@ -97,7 +98,7 @@ set(PLANNING_INTERFACE_SOURCES
 	src/PlanParsing/POPFPlanParser.cpp
 	src/PlanParsing/CFFPlanParser.cpp
 	src/PlanParsing/CLGPlanParser.cpp
-	src/PlanParsing/POPFEsterelPlanParser.cpp
+	src/PlanParsing/POPFEsterelPlanParser.cpp	
 	src/ProblemGeneration/PDDLProblemGenerator.cpp
 	src/PlanningEnvironment.cpp
 	src/EsterelPlan.cpp)
