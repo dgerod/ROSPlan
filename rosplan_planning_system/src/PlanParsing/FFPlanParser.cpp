@@ -103,8 +103,6 @@ namespace KCL_rosplan {
     */
     void FFPlanParser::preparePlan(std::string &dataPath, PlanningEnvironment &environment, size_t freeActionID) {
 
-        ROS_INFO("KCL: (FFPlanParser) Loading plan from file: %s. Initial action ID: %zu", dataPath.c_str(), freeActionID);
-                
         std::string filePath;
 
         if(dataPath.rfind("/") == dataPath.length()-1) {
@@ -113,6 +111,8 @@ namespace KCL_rosplan {
         else {
             filePath = dataPath;
         }
+        
+        ROS_INFO("KCL: (PS)(FFPlanParser) Plan file: %s. Initial action ID: %zu", filePath.c_str(), freeActionID);
         
         std::ifstream infile(filePath.c_str());
         std::string line;
@@ -163,37 +163,39 @@ namespace KCL_rosplan {
                     size_t idx = 0;
                                         
                     // actions look like this:
-                    // step    0: got_place C1
-                    //         1: find_object V1 C1 
+                    // step    0: MOVE_TO_PLACE B1 C1
+                    //         1: FIND_OBJECT V1 
                     str_utils::split(line, s, ' ');
                     if(s[0] == "step") { idx = 1; }
 
-                    unsigned int action_id = std::atoi(s[idx].substr(0,s[idx].size()-1).c_str());
                     std::string operator_name = s[idx+1];                    
-
-                    msg.action_id = planActionId;
-                    msg.name = operator_name;
-                    msg.dispatch_time = 0.0;
-
+                                       
                     // collect parameters
                     std::vector<std::string> params;
                     for(size_t pdx=idx+2; pdx<s.size(); pdx++) {                        
                         params.push_back(s[pdx]);
-                        pdx++;
                     }
+                          
+                    // Prepare action dispatch message
+                    msg.action_id = planActionId;
+                    msg.name = operator_name;
+                    msg.dispatch_time = 0.0;                    
                     
                     if(params.size() > 0) {
                         processPDDLParameters(msg, params, environment);
                     }
-                    
+
                     action_list.push_back(msg);
                     planActionId++;
+
+                    ROS_INFO("KCL: (PS)(FFPlanParser) Generate action - ID: %zu, Name: %s", planActionId, operator_name.c_str());
                     
                 }
                 // no more actions, so parsing is done
                 else                    
                 {
                     isPlanParsed = true;
+       
                 }
             }
             
