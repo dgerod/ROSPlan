@@ -9,8 +9,7 @@
 #include <ctype.h>
 #include <string>
 
-/* implementation of rosplan_planning_system::FFPlanParser.h */
-namespace KCL_rosplan {
+namespace KCL_rosplan { namespace ff {
          
     /*---------------------*/
     /* string manipulation */
@@ -184,11 +183,11 @@ namespace KCL_rosplan {
                     if(params.size() > 0) {
                         processPDDLParameters(msg, params, environment);
                     }
-
                     action_list.push_back(msg);
-                    planActionId++;
 
                     ROS_INFO("KCL: (PS)(FFPlanParser) Generate action - ID: %zu, Name: %s", planActionId, operator_name.c_str());
+
+                    planActionId++;
                     
                 }
                 // no more actions, so parsing is done
@@ -240,4 +239,4 @@ namespace KCL_rosplan {
 		}
 	}
 
-} // close namespace
+}}

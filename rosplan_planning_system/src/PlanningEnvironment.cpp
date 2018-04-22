@@ -32,7 +32,7 @@ namespace KCL_rosplan {
 
 		domain_parsed = true;
 		std::string domainFileName = (domainPath);
-		ROS_INFO("KCL: (PS) Parsing domain: %s.", domainFileName.c_str());
+		ROS_INFO("KCL: (PS)(PE) Parsing domain: %s.", domainFileName.c_str());
 
 		
 		// save filename for VAL
@@ -47,12 +47,12 @@ namespace KCL_rosplan {
 		VAL::yfl = new yyFlexLexer;
 
 		if (!domainFile.is_open() || domainFile.fail() || domainFile.bad()) {
-			ROS_ERROR("KCL: (PS) Failed to open domain file.");
+			ROS_ERROR("KCL: (PS)(PE) Failed to open domain file.");
 			line_no = 0;
 			VAL::log_error(VAL::E_FATAL,"Failed to open file");
 		} else {
 			
-			ROS_INFO("KCL: (PS) File does exist: %s.", domainFileName.c_str());
+			ROS_INFO("KCL: (PS)(PE) File does exist: %s.", domainFileName.c_str());
 
 			
 			line_no = 1;
@@ -63,7 +63,7 @@ namespace KCL_rosplan {
 			VAL::domain* domain = VAL::current_analysis->the_domain;
 			if (domain == NULL)
 			{
-				ROS_ERROR("KCL: (PS) Domain could not be parsed!");
+				ROS_ERROR("KCL: (PS)(PE) Domain could not be parsed!");
 				return;
 			}
 			
@@ -127,7 +127,7 @@ namespace KCL_rosplan {
 		domainFile.close();
 		delete VAL::yfl;
 		
-		ROS_INFO("KCL: (PS) Finished parsing domain: %s.", domainFileName.c_str());
+		ROS_INFO("KCL: (PS)(PE) Finished parsing domain: %s.", domainFileName.c_str());
 	}
 
 	/**
@@ -136,18 +136,18 @@ namespace KCL_rosplan {
 	 * TODO: test negative precondition support.
 	 */
 	void PlanningEnvironment::parsePrecondition(const std::string &opName, const VAL::goal* goal, bool negative) {
-		
+		                
 		const VAL::neg_goal* ng = dynamic_cast<const VAL::neg_goal*>(goal);
 		if (ng) {
-			parsePrecondition(opName, ng->getGoal(), !negative);
+            parsePrecondition(opName, ng->getGoal(), !negative);
 			return;
 		}
 
 		const VAL::simple_goal* sg = dynamic_cast<const VAL::simple_goal*>(goal);
-		if (sg) {
+		if (sg) {        
 			const VAL::proposition* prop = sg->getProp();
 			std::vector<string> precondition;
-			precondition.push_back(prop->head->symbol::getName());
+            precondition.push_back(prop->head->symbol::getName());
 	        for (VAL::parameter_symbol_list::const_iterator ci = prop->args->begin(); ci != prop->args->end(); ci++) {
 				const VAL::parameter_symbol* param = *ci;
 				precondition.push_back(param->symbol::getName());
@@ -191,7 +191,7 @@ namespace KCL_rosplan {
 	 */
 	void PlanningEnvironment::update(ros::NodeHandle nh) {
 
-		ROS_INFO("KCL: (PS) Fetching objects");
+		ROS_INFO("KCL: (PS)(PE) Fetching objects");
 
 		// clear old problem
 		clear();
@@ -218,10 +218,10 @@ namespace KCL_rosplan {
 					object_type_map[name] = domain_types[t];
 				}
 			} else {
-				ROS_ERROR("KCL: (PS) Failed to call service /kcl_rosplan/get_instances: %s", instanceSrv.request.type_name.c_str());
+				ROS_ERROR("KCL: (PS)(PE) Failed to call service /kcl_rosplan/get_instances: %s", instanceSrv.request.type_name.c_str());
 			}
 		}
-		ROS_INFO("KCL: (PS) Fetch attributes and functions");
+		ROS_INFO("KCL: (PS)(PE) Fetch attributes and functions");
 
 		// get domain attributes and functions
 		std::map<std::string,std::vector<std::string> >::iterator ait;
@@ -238,7 +238,7 @@ namespace KCL_rosplan {
 					}
 				}
 			} else {
-				ROS_ERROR("KCL: (PS) Failed to call service /kcl_rosplan/get_domain_attributes %s", domainAttrSrv.request.predicate_name.c_str());
+				ROS_ERROR("KCL: (PS)(PE) Failed to call service /kcl_rosplan/get_domain_attributes %s", domainAttrSrv.request.predicate_name.c_str());
 			}
 		}
 		for(ait = domain_functions.begin(); ait != domain_functions.end(); ait++) {
@@ -251,12 +251,12 @@ namespace KCL_rosplan {
 						domain_attributes.push_back(attr);
 				}
 			} else {
-				ROS_ERROR("KCL: (PS) Failed to call service /kcl_rosplan/get_domain_attributes %s", domainAttrSrv.request.predicate_name.c_str());
+				ROS_ERROR("KCL: (PS)(PE) Failed to call service /kcl_rosplan/get_domain_attributes %s", domainAttrSrv.request.predicate_name.c_str());
 			}
 		}
 
 		// get current goals
-		ROS_INFO("KCL: (PS) Fetch goals");
+		ROS_INFO("KCL: (PS)(PE) Fetch goals");
 		rosplan_knowledge_msgs::GetAttributeService currentGoalSrv;
 		if (GetCurrentGoalsClient.call(currentGoalSrv)) {
 			for(size_t j=0;j<currentGoalSrv.response.attributes.size();j++) {
@@ -265,9 +265,9 @@ namespace KCL_rosplan {
 					goal_attributes.push_back(attr);
 			}
 		} else {
-			ROS_ERROR("KCL: (PS) Failed to call service /kcl_rosplan/get_current_goals");
+			ROS_ERROR("KCL: (PS)(PE) Failed to call service /kcl_rosplan/get_current_goals");
 		}
 		
-		ROS_INFO("KCL: (PS) Update complete");
+		ROS_INFO("KCL: (PS)(PE) Update complete");
 	}
 } // close namespace

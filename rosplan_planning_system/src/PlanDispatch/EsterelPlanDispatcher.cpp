@@ -1,6 +1,5 @@
 #include "rosplan_planning_system/EsterelPlanDispatcher.h"
 
-
 namespace KCL_rosplan {
 
 	/*-------------*/
@@ -8,21 +7,6 @@ namespace KCL_rosplan {
 	/*-------------*/
 
 	EsterelPlanDispatcher::EsterelPlanDispatcher(CLGPlanParser &parser)
-		: action_id_offset(0)
-	{
-		ros::NodeHandle nh("~");
-		nh.param("/rosplan/strl_file_path", strl_file, std::string("common/plan.strl"));
-
-		plan_nodes = &(parser.plan_nodes);
-		plan_edges = &(parser.plan_edges);
-
-		current_action = 0;
-
-		query_knowledge_client = nh.serviceClient<rosplan_knowledge_msgs::KnowledgeQueryService>("/kcl_rosplan/query_knowledge_base");
-		plan_graph_publisher = nh.advertise<std_msgs::String>("/kcl_rosplan/plan_graph", 1000, true);
-	}
-
-	EsterelPlanDispatcher::EsterelPlanDispatcher(CFFPlanParser &parser)
 		: action_id_offset(0)
 	{
 		ros::NodeHandle nh("~");
@@ -52,6 +36,37 @@ namespace KCL_rosplan {
 		plan_graph_publisher = nh.advertise<std_msgs::String>("/kcl_rosplan/plan_graph", 1000, true);
 	}
 
+	
+	EsterelPlanDispatcher::EsterelPlanDispatcher(cff_esterel::CFFPlanParser &parser)
+		: action_id_offset(0)
+	{
+		ros::NodeHandle nh("~");
+		nh.param("/rosplan/strl_file_path", strl_file, std::string("common/plan.strl"));
+
+		plan_nodes = &(parser.plan_nodes);
+		plan_edges = &(parser.plan_edges);
+
+		current_action = 0;
+
+		query_knowledge_client = nh.serviceClient<rosplan_knowledge_msgs::KnowledgeQueryService>("/kcl_rosplan/query_knowledge_base");
+		plan_graph_publisher = nh.advertise<std_msgs::String>("/kcl_rosplan/plan_graph", 1000, true);
+	}
+	
+	EsterelPlanDispatcher::EsterelPlanDispatcher(ff_esterel::FFPlanParser &parser)
+		: action_id_offset(0)
+	{
+		ros::NodeHandle nh("~");
+		nh.param("strl_file_path", strl_file, std::string("common/plan.strl"));
+
+		plan_nodes = &parser.plan_nodes;
+		plan_edges = &parser.plan_edges;
+
+		current_action = 0;
+
+		query_knowledge_client = nh.serviceClient<rosplan_knowledge_msgs::KnowledgeQueryService>("/kcl_rosplan/query_knowledge_base");
+		plan_graph_publisher = nh.advertise<std_msgs::String>("/kcl_rosplan/plan_graph", 1000, true);
+	}
+	
 	/*---------------*/
 	/* public access */
 	/*---------------*/
@@ -185,7 +200,7 @@ namespace KCL_rosplan {
 		nh.param("/rosplan/data_path", data_path, std::string("common/"));
 
 		// dispatch plan
-		ROS_INFO("KCL: (EsterelPlanDispatcher) Dispatching plan");
+		ROS_INFO("KCL: (PS)(EPD) Dispatching plan");
 		
 		replan_requested = false;
 		bool repeatAction = false;
@@ -199,7 +214,7 @@ namespace KCL_rosplan {
 		printPlan(data_path);
 
 		// query KMS for condition edges
-		ROS_INFO("KCL: (EsterelPlanDispatcher) Initialise the external conditions.");
+		ROS_INFO("KCL: (PS)(EPD) Initialise the external conditions.");
 
 		for (std::vector<StrlEdge*>::const_iterator ci = plan_edges->begin(); ci != plan_edges->end(); ++ci) {
 			StrlEdge* edge = *ci;
@@ -220,7 +235,7 @@ namespace KCL_rosplan {
 					edge->active = true;
 				}
 			} else {
-				ROS_ERROR("KCL: (EsterelPlanDispatcher) Query to KMS failed; no condition edges are true.");
+				ROS_ERROR("KCL: (PS)(EPD) Query to KB failed; no condition edges are true.");
 			}
 		}
 		
@@ -240,7 +255,7 @@ namespace KCL_rosplan {
 
 			// cancel plan
 			if(plan_cancelled) {
-				ROS_INFO("KCL: (EsterelPlanDispatcher) Plan has been cancelled!");
+				ROS_INFO("KCL: (PS)(EPD) Plan has been cancelled!");
 				break;
 			}
 
@@ -283,7 +298,7 @@ namespace KCL_rosplan {
 										break;
 									}
 								} else {
-									ROS_ERROR("KCL: (EsterelPlanDispatcher) Query to KMS failed; no condition edges are true.");
+									ROS_ERROR("KCL: (PS)(EPD) Query to KB failed; no condition edges are true.");
 								}
 							}
 						}
@@ -304,7 +319,7 @@ namespace KCL_rosplan {
 						currentMessage.action_id = currentMessage.action_id + action_id_offset;
 						
 						// dispatch action
-						ROS_INFO("KCL: (EsterelPlanDispatcher) Dispatching action [%i, %s, %f, %f]", currentMessage.action_id, currentMessage.name.c_str(), (currentMessage.dispatch_time+planStart-missionStart), currentMessage.duration);
+						ROS_INFO("KCL: (PS)(EPD) Dispatching action [%i, %s, %f, %f]", currentMessage.action_id, currentMessage.name.c_str(), (currentMessage.dispatch_time+planStart-missionStart), currentMessage.duration);
 						action_publisher.publish(currentMessage);
 						current_action = strl_node->node_id;
 					}
@@ -318,7 +333,7 @@ namespace KCL_rosplan {
 						finished_execution = false;
 						state_changed = true;
 						
-						ROS_INFO("KCL: (EsterelPlanDispatcher) %i: action %s completed", strl_node->node_id, strl_node->node_name.c_str());
+						ROS_INFO("KCL: (PS)(EPD) %i: action %s completed", strl_node->node_id, strl_node->node_name.c_str());
 
 						// emit output edges in next loop
 						for(int i=0;i<strl_node->output.size();i++) {
@@ -348,7 +363,7 @@ namespace KCL_rosplan {
 
 			// cancel dispatch on replan
 			if(replan_requested) {
-				ROS_INFO("KCL: (EsterelPlanDispatcher) Replan requested");
+				ROS_INFO("KCL: (PS)(EPD) Replan requested");
 				return false;
 			}
 		}
@@ -374,7 +389,7 @@ namespace KCL_rosplan {
 		// no matching action
 		if(!found) return;
 
-		ROS_INFO("KCL: (EsterelPlanDispatcher) Feedback received [%i, %s]", msg->action_id, msg->status.c_str());
+		ROS_INFO("KCL: (PS)(EPD) Feedback received [%i, %s]", msg->action_id, msg->status.c_str());
 
 		// action enabled
 		int normalised_action_id = msg->action_id - action_id_offset;

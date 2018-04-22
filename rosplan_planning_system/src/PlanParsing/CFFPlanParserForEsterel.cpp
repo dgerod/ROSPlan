@@ -1,4 +1,4 @@
-#include "rosplan_planning_system/CFFPlanParser.h"
+#include "rosplan_planning_system/CFFPlanParserForEsterel.h"
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -7,8 +7,7 @@
 #include <algorithm>
 #include <ctype.h>
 
-/* implementation of rosplan_planning_system::CFFPlanParser.h */
-namespace KCL_rosplan {
+namespace KCL_rosplan { namespace cff_esterel {
 
 	/* constructor */
 	CFFPlanParser::CFFPlanParser(ros::NodeHandle &nh) : node_handle(&nh)
@@ -314,7 +313,7 @@ namespace KCL_rosplan {
 		std::ifstream infile((dataPath + "plan.pddl").c_str());
 		std::string line;
 		std::vector<std::string> s;
-		int curr,next,nodeCount;
+		int curr ,next, nodeCount;
 		bool planFound = false;
 		bool planRead = false;
 		
@@ -408,4 +407,5 @@ namespace KCL_rosplan {
 	bool CFFPlanParser::produceEsterel() {
 		// nothing right now...
 	}
-} // close namespace
+	
+}} 

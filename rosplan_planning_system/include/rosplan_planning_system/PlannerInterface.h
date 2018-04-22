@@ -13,10 +13,7 @@
 #include "PDDLProblemGenerator.h"
 
 #include "PlanParser.h"
-#include "POPFPlanParser.h"
 #include "POPFEsterelPlanParser.h"
-#include "CFFPlanParser.h"
-#include "CLGPlanParser.h"
 
 #ifndef KCL_planner_interface
 #define KCL_planner_interface

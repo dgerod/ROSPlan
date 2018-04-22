@@ -10,9 +10,10 @@
 
 #include "PlanDispatcher.h"
 #include "EsterelPlan.h"
-#include "CFFPlanParser.h"
 #include "CLGPlanParser.h"
 #include "POPFEsterelPlanParser.h"
+#include "FFPlanParserForEsterel.h"
+#include "CFFPlanParserForEsterel.h"
 
 #ifndef KCL_esterel_dispatcher
 #define KCL_esterel_dispatcher
@@ -49,9 +50,10 @@ namespace KCL_rosplan
 
 		/* constructor */
 		EsterelPlanDispatcher(CLGPlanParser &parser);
-		EsterelPlanDispatcher(CFFPlanParser &parser);
 		EsterelPlanDispatcher(POPFEsterelPlanParser &parser);
-
+        EsterelPlanDispatcher(cff_esterel::CFFPlanParser &parser);		
+		EsterelPlanDispatcher(ff_esterel::FFPlanParser &parser);
+        
 		/* access */
 		int getCurrentAction();
 		void setCurrentAction(size_t freeActionID);

@@ -9,7 +9,6 @@
 #include <ctype.h>
 #include <string>
 
-/* implementation of rosplan_planning_system::FFPlanParser.h */
 namespace KCL_rosplan { namespace ff_esterel {
          
     //---------------------
@@ -50,18 +49,15 @@ namespace KCL_rosplan { namespace ff_esterel {
     // Fast Forward parser 
     //---------------------
         
-    FFPlanParserForEsterel::FFPlanParserForEsterel() 
+    FFPlanParser::FFPlanParser() 
     {
-       	// knowledge interface
-		//update_knowledge_client = nh.serviceClient<rosplan_knowledge_msgs::KnowledgeUpdateService>("/kcl_rosplan///update_knowledge_base");
-
-		// create operator observation and parameter maps
+       	// create operator observation and parameter maps
 		parseDomain(); 
     }
     
-    FFPlanParserForEsterel::~FFPlanParserForEsterel() {}
+    FFPlanParser::~FFPlanParser() {}
 
-    void FFPlanParserForEsterel::reset() {
+    void FFPlanParser::reset() {
         plan_nodes.clear();
         plan_edges.clear();
     }
@@ -69,7 +65,7 @@ namespace KCL_rosplan { namespace ff_esterel {
     // parse domain
     //----------------
     
-	void FFPlanParserForEsterel::parseDomain() {
+	void FFPlanParser::parseDomain() {
 		
 		ros::NodeHandle nh;
 
@@ -192,7 +188,7 @@ namespace KCL_rosplan { namespace ff_esterel {
     // Creating nodes and edges 
 	//--------------------------
 
-	void FFPlanParserForEsterel::createNode(std::vector<std::string> &s, const std::string& operator_name, int node_id, PlanningEnvironment &environment, StrlNode& node) {
+	void FFPlanParser::createNode(std::vector<std::string> &s, const std::string& operator_name, int node_id, PlanningEnvironment &environment, StrlNode& node) {
 
 		// concatenate parameters
 		std::stringstream ss;
@@ -217,7 +213,7 @@ namespace KCL_rosplan { namespace ff_esterel {
 		plan_nodes.push_back(&node);
 	}
 
-	void FFPlanParserForEsterel::createEdge(std::string &child_cffid, StrlNode &node, StrlEdge &edge) {
+	void FFPlanParser::createEdge(std::string &child_cffid, StrlNode &node, StrlEdge &edge) {
 					
 		// save this parent edge
 		edge.signal_type = ACTION;
@@ -237,7 +233,7 @@ namespace KCL_rosplan { namespace ff_esterel {
     // parse a plan written by FF
     //----------------    
         
-    void FFPlanParserForEsterel::preparePlan(std::string &dataPath, PlanningEnvironment &environment, size_t freeActionID) {
+    void FFPlanParser::preparePlan(std::string &dataPath, PlanningEnvironment &environment, size_t freeActionID) {
 
         std::string filePath;
 
@@ -368,9 +364,9 @@ namespace KCL_rosplan { namespace ff_esterel {
         infile.close();
     }
   
-  	void FFPlanParserForEsterel::preparePDDLConditions(std::string operator_name, std::vector<std::string> parameters, StrlNode &node, PlanningEnvironment &environment) {}
+  	void FFPlanParser::preparePDDLConditions(std::string operator_name, std::vector<std::string> parameters, StrlNode &node, PlanningEnvironment &environment) {}
 	
-	void FFPlanParserForEsterel::preparePDDLObservation(std::string &operator_name, std::vector<std::string> &parameters, StrlEdge &edge, bool isNegative) {
+	void FFPlanParser::preparePDDLObservation(std::string &operator_name, std::vector<std::string> &parameters, StrlEdge &edge, bool isNegative) {
 
 		// generate grounded observation
 		std::stringstream grounded_observation;
@@ -415,14 +411,14 @@ namespace KCL_rosplan { namespace ff_esterel {
 		}
 	}
 	
-	void FFPlanParserForEsterel::generateFilter(PlanningEnvironment &environment) {
+	void FFPlanParser::generateFilter(PlanningEnvironment &environment) {
 		// do nothing yet
 	}
     // Produce Esterel 
     //-------------------
 
     // output a plan as an Esterel controller
-    bool FFPlanParserForEsterel::produceEsterel() {
+    bool FFPlanParser::produceEsterel() {
 
 		// output file
 		std::string strl_file;
@@ -518,4 +514,4 @@ namespace KCL_rosplan { namespace ff_esterel {
 		dest.close();
 	}
     
-}} // close namespace
+}}

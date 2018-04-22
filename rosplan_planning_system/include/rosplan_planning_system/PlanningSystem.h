@@ -16,12 +16,12 @@
 #include "PDDLProblemGenerator.h"
 
 #include "PlanParser.h"
-#include "POPFPlanParser.h"
-#include "POPFEsterelPlanParser.h"
-#include "CFFPlanParser.h"
 #include "CLGPlanParser.h"
+#include "POPFPlanParser.h"
 #include "FFPlanParser.h"
+#include "POPFEsterelPlanParser.h"
 #include "FFPlanParserForEsterel.h"
+#include "CFFPlanParserForEsterel.h"
 
 #include "PlanDispatcher.h"
 #include "SimplePlanDispatcher.h"

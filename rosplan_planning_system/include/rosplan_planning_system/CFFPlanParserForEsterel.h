@@ -13,14 +13,13 @@
 #ifndef KCL_cff_plan_parser
 #define KCL_cff_plan_parser
 
-namespace KCL_rosplan {
+namespace KCL_rosplan { namespace cff_esterel {
 
 	/* Plan Parsing class definition */
 	class CFFPlanParser: public PlanParser
 	{
 
 	private:
-		
 		// ROS node handle.
 		ros::NodeHandle* node_handle;
 		
@@ -46,11 +45,6 @@ namespace KCL_rosplan {
 		void createEdge(std::string &child_cffid, StrlNode &node, StrlEdge &edge);
 
 	public:
-
-		/* plan description in Esterel */
-		std::vector<StrlNode*> plan_nodes;
-		std::vector<StrlEdge*> plan_edges;
-
 		/* constructor */
 		CFFPlanParser(ros::NodeHandle &nh);
 
@@ -61,6 +55,11 @@ namespace KCL_rosplan {
 		void reset();
 		void preparePlan(std::string &dataPath, PlanningEnvironment &environment, size_t freeActionID);
 		void generateFilter(PlanningEnvironment &environment);
+
+		/* plan description in Esterel */
+		std::vector<StrlNode*> plan_nodes;
+		std::vector<StrlEdge*> plan_edges;	
 	};
-}
+}}
+
 #endif

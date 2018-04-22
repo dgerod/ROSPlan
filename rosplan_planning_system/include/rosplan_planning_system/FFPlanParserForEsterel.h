@@ -19,7 +19,7 @@ namespace KCL_rosplan { namespace ff_esterel {
         unsigned int split(const std::string &txt, std::vector<std::string> &strs, char ch);
     }
 
-    class FFPlanParserForEsterel: public PlanParser
+    class FFPlanParser: public PlanParser
     {
     private:                
         std::map<std::string,StrlNode*> ff_node_map;
@@ -36,8 +36,8 @@ namespace KCL_rosplan { namespace ff_esterel {
         void preparePDDLConditions(std::string operator_name, std::vector<std::string> parameters, StrlNode &node, PlanningEnvironment &environment);
         
 public:        
-        FFPlanParserForEsterel();
-        virtual ~FFPlanParserForEsterel();        
+        FFPlanParser();
+        virtual ~FFPlanParser();        
         void reset();
         
         void preparePlan(std::string &dataPath, PlanningEnvironment &environment, size_t freeActionID);

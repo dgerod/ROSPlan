@@ -9,7 +9,7 @@
 #ifndef KCL_ff_plan_parser
 #define KCL_ff_plan_parser
 
-namespace KCL_rosplan {
+namespace KCL_rosplan { namespace ff {
 
     namespace str_utils {
         
@@ -32,6 +32,6 @@ namespace KCL_rosplan {
         void preparePlan(std::string &dataPath, PlanningEnvironment &environment, size_t freeActionID);
         void generateFilter(PlanningEnvironment &environment);
     };
-}
+}}
 
 #endif

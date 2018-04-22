@@ -46,7 +46,7 @@ namespace KCL_rosplan {
 		ros::NodeHandle nh("~");
 		ros::Rate loop_rate(10);
 
-		ROS_INFO("KCL: (PS) Dispatching plan");
+		ROS_INFO("KCL: (PS)(SPD) Dispatching plan");
 		replan_requested = false;
 		bool repeatAction = false;
 
@@ -66,7 +66,7 @@ namespace KCL_rosplan {
 			// get next action
 			rosplan_dispatch_msgs::ActionDispatch currentMessage = actionList[current_action];
 			if((unsigned int)currentMessage.action_id != current_action)
-				ROS_ERROR("KCL: (PS) Message action_id [%d] does not meet expected [%zu]", currentMessage.action_id, current_action);
+				ROS_ERROR("KCL: (PS)(SPD) Message action_id [%d] does not meet expected [%zu]", currentMessage.action_id, current_action);
 
 			// loop while waiting for dispatch time
 			if(!dispatch_on_completion) {
@@ -77,7 +77,7 @@ namespace KCL_rosplan {
 					loop_rate.sleep();
 					double remaining = planStart + currentMessage.dispatch_time - ros::WallTime::now().toSec();
 					if(wait_print > (int)remaining / wait_period) {
-						ROS_INFO("KCL: (PS) Waiting %f before dispatching action: [%i, %s, %f, %f]",
+						ROS_INFO("KCL: (PS)(SPD) Waiting %f before dispatching action: [%i, %s, %f, %f]",
 								remaining,currentMessage.action_id, currentMessage.name.c_str(),
 								 (currentMessage.dispatch_time+planStart-missionStart), currentMessage.duration);
 						wait_print--;
@@ -86,7 +86,7 @@ namespace KCL_rosplan {
 			}
 
 			if(!checkPreconditions(currentMessage)) {
-				ROS_INFO("KCL: (PS) Preconditions not achieved [%i, %s]", currentMessage.action_id, currentMessage.name.c_str());
+				ROS_INFO("KCL: (PS)(SPD) Preconditions not achieved [%i, %s]", currentMessage.action_id, currentMessage.name.c_str());
 
 				// publish feedback (precondition false)
 				rosplan_dispatch_msgs::ActionFeedback fb;
@@ -98,10 +98,11 @@ namespace KCL_rosplan {
 			} else {
 
 				// dispatch action
-				ROS_INFO("KCL: (PS) Dispatching action [%i, %s, %f, %f]", currentMessage.action_id, currentMessage.name.c_str(), (currentMessage.dispatch_time+planStart-missionStart), currentMessage.duration);
+				ROS_INFO("KCL: (PS)(SPD) Dispatching action [%i, %s, %f, %f]", currentMessage.action_id, currentMessage.name.c_str(), (currentMessage.dispatch_time+planStart-missionStart), currentMessage.duration);
+                
 				action_publisher.publish(currentMessage);
 				double late_print = (ros::WallTime::now().toSec() - (currentMessage.dispatch_time + planStart));
-				if(late_print>0.1) ROS_INFO("KCL: (PS) Action [%i] is %f second(s) late", currentMessage.action_id, late_print);
+				if(late_print>0.1) ROS_INFO("KCL: (PS)(SPD) Action [%i] is %f second(s) late", currentMessage.action_id, late_print);
 
 				// wait for action to complete
 				if(!dispatch_concurrent) {
@@ -111,7 +112,7 @@ namespace KCL_rosplan {
 						loop_rate.sleep();
 						counter++;
 						if (counter == 2000) {
-							ROS_INFO("KCL: (PS) Action %i timed out now. Cancelling...", currentMessage.action_id);
+							ROS_INFO("KCL: (PS)(SPD) Action %i timed out now. Cancelling...", currentMessage.action_id);
 							rosplan_dispatch_msgs::ActionDispatch cancelMessage;
 							cancelMessage.action_id = currentMessage.action_id;
 							cancelMessage.name = "cancel_action";
@@ -135,6 +136,8 @@ namespace KCL_rosplan {
 
 	bool SimplePlanDispatcher::checkPreconditions(rosplan_dispatch_msgs::ActionDispatch msg) {
 
+        return true;
+        
 		// setup service call
 		ros::NodeHandle nh;
 		ros::ServiceClient queryKnowledgeClient = nh.serviceClient<rosplan_knowledge_msgs::KnowledgeQueryService>("/kcl_rosplan/query_knowledge_base");
@@ -144,21 +147,27 @@ namespace KCL_rosplan {
 		oit = environment.domain_operator_precondition_map.find(msg.name);
 		if(oit==environment.domain_operator_precondition_map.end()) return false;
 
+        ROS_INFO("KCL: (PS)(SPD)(cp)        [%s]", msg.name.c_str());
+            
 		// iterate through conditions
 		std::vector<std::vector<std::string> >::iterator cit = oit->second.begin();
 		for(; cit!=oit->second.end(); cit++) {
-			
+        
 			rosplan_knowledge_msgs::KnowledgeItem condition;
 			
 			// set fact or function
 			std::map<std::string,std::vector<std::string> >::iterator dit = environment.domain_predicates.find((*cit)[0]);
-			if(dit!=environment.domain_predicates.end()) condition.knowledge_type = rosplan_knowledge_msgs::KnowledgeItem::FACT;
+			if(dit!=environment.domain_predicates.end()) condition.knowledge_type =  rosplan_knowledge_msgs::KnowledgeItem::FACT;
 
 			dit = environment.domain_functions.find((*cit)[0]);
 			if(dit!=environment.domain_functions.end()) condition.knowledge_type = rosplan_knowledge_msgs::KnowledgeItem::FUNCTION;
 
 			// populate parameters
 			condition.attribute_name = (*cit)[0];
+            
+            ROS_INFO("KCL: (PS)(SPD)(cp)        type:[%d] condition:[%d, %s]", 
+                     condition.knowledge_type, condition.is_negative, condition.attribute_name.c_str());
+                
 			int index = 1;
 			std::vector<std::string>::iterator pit;
 			for(pit=environment.domain_predicates[condition.attribute_name].begin();
@@ -187,12 +196,17 @@ namespace KCL_rosplan {
 			if(!querySrv.response.all_true) {
 				std::vector<rosplan_knowledge_msgs::KnowledgeItem>::iterator kit;
 				for(kit=querySrv.response.false_knowledge.begin(); kit != querySrv.response.false_knowledge.end(); kit++)
-					ROS_INFO("KCL: (PS)        [%s]", kit->attribute_name.c_str());
+                {
+                    if (!kit->is_negative) 
+                        { ROS_INFO("KCL: (PS)(SPD)        [%s]", kit->attribute_name.c_str()); }
+                    else 
+                        { ROS_INFO("KCL: (PS)(SPD)    NOT [%s]", kit->attribute_name.c_str()); }
+                }
 			}
 			return querySrv.response.all_true;
 
 		} else {
-			ROS_ERROR("KCL: (PS) Failed to call service /kcl_rosplan/query_knowledge_base");
+			ROS_ERROR("KCL: (PS)(SPD) Failed to call service /kcl_rosplan/query_knowledge_base");
 		}
 	}
 
@@ -206,9 +220,9 @@ namespace KCL_rosplan {
 	void SimplePlanDispatcher::feedbackCallback(const rosplan_dispatch_msgs::ActionFeedback::ConstPtr& msg) {
 
 		// create error if the action is unrecognised
-		ROS_INFO("KCL: (PS) Feedback received [%i, %s]", msg->action_id, msg->status.c_str());
+		ROS_INFO("KCL: (PS)(SPD) Feedback received [%i, %s]", msg->action_id, msg->status.c_str());
 		if(current_action != (unsigned int)msg->action_id)
-			ROS_ERROR("KCL: (PS) Unexpected action ID: %d; current action: %zu", msg->action_id, current_action);
+			ROS_ERROR("KCL: (PS)(SPD) Unexpected action ID: %d; current action: %zu", msg->action_id, current_action);
 
 		// action enabled
 		if(!action_received[msg->action_id] && (0 == msg->status.compare("action enabled")))
