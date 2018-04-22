@@ -45,13 +45,15 @@ namespace KCL_rosplan {
                           std::string("timeout 10 PLANNER_PATH/ff -o DOMAIN -f PROBLEM"));
         planner_list["ff-esterel"].dispatcher 
             = new EsterelPlanDispatcher(*dynamic_cast<ff_esterel::FFPlanParser*>(planner_list["ff-esterel"].parser));
-        
+    
+        /*
         // cff
         planner_list["cff"] 
-            = PlannerInfo(new cff_esterel::CFFPlanParser(nh),  
+            = PlannerInfo(new cff::CFFPlanParser(nh),  
                           std::string("timeout 10 PLANNER_PATH/Contingent-FF -o DOMAIN -f PROBLEM"));
         planner_list["cff"].dispatcher = new SimplePlanDispatcher();
-        
+        */
+    
         // cff-esterel
         planner_list["cff-esterel"] 
             = PlannerInfo(new cff_esterel::CFFPlanParser(nh),  

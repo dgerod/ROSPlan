@@ -10,10 +10,10 @@
 #include "PlanParser.h"
 #include "EsterelPlan.h"
 
-#ifndef KCL_cff_esterel_plan_parser
-#define KCL_cff_esterel_plan_parser
+#ifndef KCL_cff_plan_parser
+#define KCL_cff_plan_parser
 
-namespace KCL_rosplan { namespace cff_esterel {
+namespace KCL_rosplan { namespace cff {
 
 	/* Plan Parsing class definition */
 	class CFFPlanParser: public PlanParser

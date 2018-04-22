@@ -19,6 +19,7 @@
 #include "CLGPlanParser.h"
 #include "POPFPlanParser.h"
 #include "FFPlanParser.h"
+#include "CFFPlanParser.h"
 #include "POPFEsterelPlanParser.h"
 #include "FFPlanParserForEsterel.h"
 #include "CFFPlanParserForEsterel.h"
