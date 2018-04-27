@@ -14,19 +14,8 @@
 
 #include "PlanningEnvironment.h"
 #include "PDDLProblemGenerator.h"
-
 #include "PlanParser.h"
-#include "CLGPlanParser.h"
-#include "POPFPlanParser.h"
-#include "FFPlanParser.h"
-#include "CFFPlanParser.h"
-#include "POPFEsterelPlanParser.h"
-#include "FFPlanParserForEsterel.h"
-#include "CFFPlanParserForEsterel.h"
-
 #include "PlanDispatcher.h"
-#include "SimplePlanDispatcher.h"
-#include "EsterelPlanDispatcher.h"
 
 #ifndef KCL_planning_system
 #define KCL_planning_system

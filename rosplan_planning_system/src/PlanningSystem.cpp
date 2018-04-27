@@ -6,6 +6,16 @@
 #include <streambuf>
 #include <map>
 
+#include "rosplan_planning_system/CLGPlanParser.h"
+#include "rosplan_planning_system/POPFPlanParser.h"
+#include "rosplan_planning_system/FFPlanParser.h"
+#include "rosplan_planning_system/CFFPlanParser.h"
+#include "rosplan_planning_system/POPFEsterelPlanParser.h"
+#include "rosplan_planning_system/FFPlanParserForEsterel.h"
+#include "rosplan_planning_system/CFFPlanParserForEsterel.h"
+#include "rosplan_planning_system/SimplePlanDispatcher.h"
+#include "rosplan_planning_system/EsterelPlanDispatcher.h"
+
 namespace KCL_rosplan {
 
 	/*-------------*/
@@ -46,14 +56,12 @@ namespace KCL_rosplan {
         planner_list["ff-esterel"].dispatcher 
             = new EsterelPlanDispatcher(*dynamic_cast<ff_esterel::FFPlanParser*>(planner_list["ff-esterel"].parser));
     
-        /*
         // cff
         planner_list["cff"] 
-            = PlannerInfo(new cff::CFFPlanParser(nh),  
+            = PlannerInfo(new cff::CFFPlanParser(),  
                           std::string("timeout 10 PLANNER_PATH/Contingent-FF -o DOMAIN -f PROBLEM"));
         planner_list["cff"].dispatcher = new SimplePlanDispatcher();
-        */
-    
+            
         // cff-esterel
         planner_list["cff-esterel"] 
             = PlannerInfo(new cff_esterel::CFFPlanParser(nh),  

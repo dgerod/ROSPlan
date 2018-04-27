@@ -1,4 +1,5 @@
 #include "rosplan_planning_system/CFFPlanParser.h"
+
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -6,406 +7,239 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <ctype.h>
+#include <string>
 
 namespace KCL_rosplan { namespace cff {
+         
+    /*---------------------*/
+    /* string manipulation */
+    /*---------------------*/
+        
+    namespace str_utils {
 
-	/* constructor */
-	CFFPlanParser::CFFPlanParser(ros::NodeHandle &nh) : node_handle(&nh)
-	{
-		// knowledge interface
-		update_knowledge_client = nh.serviceClient<rosplan_knowledge_msgs::KnowledgeUpdateService>("/kcl_rosplan/update_knowledge_base");
+        void toLowerCase(std::string &str) {
+            std::transform(str.begin(), str.end(), str.begin(), tolower);
+        }
 
-		// create operator observation and parameter maps
-		parseDomain();
-	}
+        unsigned int split(const std::string &txt, std::vector<std::string> &strs, char ch) {
+            unsigned int pos = txt.find( ch );
+            unsigned int initialPos = 0;
+            strs.clear();
+            // Decompose statement
+            while( pos != std::string::npos && pos < txt.length()) {
+                if(txt.substr( initialPos, pos - initialPos + 1 ) !=" ") {
+                    std::string s = txt.substr( initialPos, pos - initialPos + 1 );
+                    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+                    strs.push_back(s);
+                }
+                initialPos = pos + 1;
+                pos = txt.find( ch, initialPos );
+            }
+            // Add the last one
+            strs.push_back( txt.substr( initialPos, txt.size() - initialPos ) );
+            return strs.size();
+        }
 
-	void CFFPlanParser::reset() {
-		plan_nodes.clear();
-		plan_edges.clear();
-	}
+    }
 
-	void CFFPlanParser::generateFilter(PlanningEnvironment &environment) {
-		// do nothing yet
-	}
+    /*---------------------*/
+    /* Fast Forward parser */
+    /*---------------------*/
+    
+    CFFPlanParser::~CFFPlanParser() {}
 
+    void CFFPlanParser::reset() {
+        filter_objects.clear();
+        filter_attributes.clear();
+        knowledge_filter.clear();
+        action_list.clear();
+    }
+    
+    /**
+    * processes the parameters of a single PDDL action into an ActionDispatch message
+    */
+    void CFFPlanParser::processPDDLParameters(rosplan_dispatch_msgs::ActionDispatch &msg, std::vector<std::string> &params, PlanningEnvironment &environment) {
+        
+        // find the correct PDDL operator definition
+        std::map<std::string,std::vector<std::string> >::iterator ait;
+        ait = environment.domain_operators.find(msg.name);
+        if(ait != environment.domain_operators.end()) {
 
-	/*---------------------*/
-	/* string manipulation */
-	/*---------------------*/
+            // add the PDDL parameters to the action dispatch
+            for(size_t i=0; i<ait->second.size(); i++) {
+                diagnostic_msgs::KeyValue pair;
+                pair.key = ait->second[i];
+                pair.value = params[i];
+                msg.parameters.push_back(pair);
 
-	void CFFPlanParser::toLowerCase(std::string &str) {
-		std::transform(str.begin(), str.end(), str.begin(), tolower);
-	}
+                // prepare object existence for the knowledge filter
+                bool toBeAdded = true;
+                for(size_t j=0; j<filter_objects.size(); j++)
+                    if(0==filter_objects[j].compare(params[i])) toBeAdded = false;
+                if(toBeAdded) filter_objects.push_back(params[i]);
+            }
 
-	unsigned int CFFPlanParser::split(const std::string &txt, std::vector<std::string> &strs, char ch) {
-		unsigned int pos = txt.find( ch );
-		unsigned int initialPos = 0;
-		strs.clear();
-		// Decompose statement
-		while( pos != std::string::npos && pos < txt.length()) {
-			if(txt.substr( initialPos, pos - initialPos + 1 ) !=" ") {
-				std::string s = txt.substr( initialPos, pos - initialPos + 1 );
-				s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-			    strs.push_back(s);
-			}
-		    initialPos = pos + 1;
-		    pos = txt.find( ch, initialPos );
+            // prepare object attributes for the knowledge filter
+            for(size_t i=0; i<environment.domain_operator_precondition_map[msg.name].size(); i++) {
+                std::vector<std::string> filterAttribute;
+                std::vector<std::string> precondition = environment.domain_operator_precondition_map[msg.name][i];
+                filterAttribute.push_back(precondition[0]);
+                for(size_t j=1; j<precondition.size(); j++) {
+                    if(j>1) filterAttribute.push_back(precondition[j]);
+                    // instance name
+                    for(size_t k=0;k<ait->second.size();k++) {
+                        if(0==ait->second[k].compare(precondition[j]))
+                            filterAttribute.push_back(params[k]);
+                    }
+                }
+                filter_attributes.push_back(filterAttribute);
+            }
+        } // end of operator
+    }
+
+    /**
+    * Parse a plan written by FF
+    */
+    void CFFPlanParser::preparePlan(std::string &dataPath, PlanningEnvironment &environment, size_t freeActionID) {
+
+        std::string filePath;
+
+        if(dataPath.rfind("/") == dataPath.length()-1) {
+            filePath = dataPath + "plan.pddl";
+        }
+        else {
+            filePath = dataPath;
+        }
+        
+        ROS_INFO("KCL: (PS)(CFFPlanParser) Plan file: %s. Initial action ID: %zu", filePath.c_str(), freeActionID);
+        
+        std::ifstream infile(filePath.c_str());
+        std::string line;
+        bool isPlanParsed = false;        
+        bool isPlanFound = false;       
+        size_t planActionId = 0;
+        planActionId = freeActionID;
+                
+        reset();
+        while(!infile.eof() && !isPlanParsed) {
+
+            std::getline(infile, line);
+
+            std::string whitespaces(" \t\f\v\n\r");
+            line.erase(line.find_last_not_of(whitespaces)+1);      
+            str_utils::toLowerCase(line);
+
+            // search actions of the plan
+            if(!isPlanFound) {
+                // loop until plan is printed             
+                if(line.compare("ff: found plan as follows") != 0) {
+                    continue;                    
+                }                
+
+                // remove empty lines after plan header
+                bool isScanning = true;
+                std::streampos lastPos;                
+                while(isScanning) {                    
+                    lastPos = infile.tellg();                
+                    std::getline(infile, line);
+                    str_utils::toLowerCase(line);                                        
+                    isScanning = !infile.eof() && line.empty();                    
+                }
+                
+                // plan is found
+                if(!infile.eof()) {
+                    isPlanFound = true;                
+                    infile.seekg(lastPos);
+                }
+            }            
+            // parse plan actions once header is found                    
+            else {
+
+                // plan action
+                if(!line.empty()) 
+                {
+                    if (!(line.compare("-------------------------------------------------")==0)) {
+                    
+                        rosplan_dispatch_msgs::ActionDispatch msg;
+                        std::vector<std::string> s;
+                        
+                        // actions look like this:
+                        // "16||1", "---", "operator_name", "param1", ..., "---", "son:", "17||-1"
+                        // "11||1", "---", "operator_name", "param1", ..., "---", "trueson:", "12||1", "---", "falseson:", "12||2"
+                        str_utils::split(line, s, ' ');
+                        std::string action_id = s[0];
+                        std::string operator_name = s[2];                    
+
+                        // collect parameters
+                        std::vector<std::string> params;
+                        int idx = 3;
+                        while (idx<s.size() && s[idx]!="---") {
+                            params.push_back(s[idx]);
+                            idx++;
+                        }
+                            
+                        // Prepare action dispatch message
+                        msg.action_id = planActionId;
+                        msg.name = operator_name;
+                        msg.dispatch_time = 0.0;                    
+                        
+                        if(params.size() > 0) {
+                            processPDDLParameters(msg, params, environment);
+                        }
+                        action_list.push_back(msg);
+
+                        ROS_INFO("KCL: (PS)(CFFPlanParser) Generate action - ID: %zu, Name: %s", planActionId, operator_name.c_str());
+
+                        planActionId++;                 
+                    }
+                }
+                // no more actions, so parsing is done
+                else                    
+                {
+                    isPlanParsed = true;
+       
+                }
+            }
+            
+        }
+
+        infile.close();
+    }
+
+    /**
+    * populates the knowledge filter messages
+    */
+    void CFFPlanParser::generateFilter(PlanningEnvironment &environment) {
+
+        knowledge_filter.clear();
+
+		// populate filter message with objects
+		for(size_t i=0; i<filter_objects.size(); i++) {
+			rosplan_knowledge_msgs::KnowledgeItem filterItem;
+			filterItem.knowledge_type = rosplan_knowledge_msgs::KnowledgeItem::INSTANCE;
+			filterItem.instance_type = environment.object_type_map[filter_objects[i]];
+			filterItem.instance_name = filter_objects[i];
+			knowledge_filter.push_back(filterItem);
 		}
-		// Add the last one
-		strs.push_back( txt.substr( initialPos, txt.size() - initialPos ) );
-		return strs.size();
-	}
 
-
-	/*--------------------------*/
-	/* Creating nodes and edges */
-	/*--------------------------*/
-
-	void CFFPlanParser::createNode(std::vector<std::string> &s, const std::string& operator_name, int node_id, PlanningEnvironment &environment, StrlNode& node) {
-
-		// concatenate parameters
-		std::stringstream ss;
-		ss << operator_name << " ";
-		int i=3;
-		while (i<s.size() && s[i]!="---") {
-			ss << s[i] << " ";
-			i++;
-		}
-
-		node.node_name = ss.str();
-		node.node_id = node_id;
-		node.dispatched = false;
-		node.completed = false;
-
-		// prepare message
-		node.dispatch_msg.action_id = node.node_id;
-		node.dispatch_msg.duration = 0.1;
-		node.dispatch_msg.dispatch_time = 0;
-		node.dispatch_msg.name = operator_name;
-
-		plan_nodes.push_back(&node);
-	}
-
-	void CFFPlanParser::createEdge(std::string &child_cffid, StrlNode &node, StrlEdge &edge) {
-					
-		// save this parent edge
-		edge.signal_type = ACTION;
-		std::stringstream ss;
-		ss << "e_" << node.node_id;
-		edge.edge_name = ss.str();
-		edge.sources.push_back(&node);
-		edge.active = false;
-		plan_edges.push_back(&edge);
-		node.output.push_back(&edge);
-
-		// prepare for child
-		incoming_edge_map[child_cffid];
-		incoming_edge_map[child_cffid].push_back(&edge);
-	}
-
-
-	/*--------------*/
-	/* parse domain */
-	/*--------------*/
-
-	/**
-	 * This method extracts the observation expressions from the domain, and maps them to operators.
-	 * This is required as VAL does not parse the operators in PDDL.
-	 */
-	void CFFPlanParser::parseDomain() {
-		
-		ros::NodeHandle nh;
-
-		std::string domain_path;
-		nh.param("/rosplan/domain_path", domain_path, std::string("common/domain.pddl"));
-
-		std::ifstream infile((domain_path).c_str());
-		std::string line;
-		std::string action_name;
-		while(!infile.eof()) {
-
-			std::getline(infile, line);
-			toLowerCase(line);
-
-			// save last seen action name
-			std::string::size_type n = line.find("(:action ");
-			if (n != std::string::npos) {
- 				n = n + 9;
-
-				action_name = line.substr(n);
-				int count = 0;
-				for(std::string::iterator it = action_name.begin(); it != action_name.end(); ++it) {
-				    if (*it == ' ')
-						break;
-					count++;
+		// populate filter message with attributes, only statics, not all preconditions.
+		for(size_t i=0; i<filter_attributes.size(); i++) {
+			rosplan_knowledge_msgs::KnowledgeItem filterItem;
+			filterItem.knowledge_type = rosplan_knowledge_msgs::KnowledgeItem::FACT;
+			filterItem.attribute_name = filter_attributes[i][0];
+			if (filter_attributes[i].size() > 1)
+			{
+				filterItem.instance_type = environment.object_type_map[filter_attributes[i][1]];
+				filterItem.instance_name = filter_attributes[i][1];
+				for(size_t j=2; j<filter_attributes[i].size()-1; j+=2) {
+					diagnostic_msgs::KeyValue pair;
+					pair.key = filter_attributes[i][j];
+					pair.value = filter_attributes[i][j+1];
+					filterItem.values.push_back(pair);
 				}
-
-				action_name = action_name.substr(0,count);
-			}
-
-			// create parameter map for this action
-			operator_parameter_map[action_name];
-
-			// add parameters to the map
-			n = line.find(":parameters ");
-			if (n != std::string::npos) {
- 				n = n + 13;
-				std::string params = line.substr(n);
-				int count_start = 0;
-				int count_length = 0;
-				bool finished = false;
-				int state = 0;
-				while(!finished && !infile.eof()) {
-					for(std::string::iterator it = params.begin(); it != params.end(); ++it) {
-						switch (state) {
-						case 0: // reading parameter
-							if (*it == '-' || *it == ' ') {
-								// std::cout << params.substr(count_start,count_length) << std::endl;
-								operator_parameter_map[action_name].push_back(params.substr(count_start,count_length));
-								state++;
-							}
-							break;
-						case 1: // skipping " - "
-							if (*it != '-' && *it != ' ') state++;
-							break;
-						case 2: // skipping type
-							if (*it == ' ') state++;
-							break;
-						case 3: // skipping spaces
-							if (*it != ' ') {
-								count_start = count_start + count_length;
-								count_length = 0;
-								state = 0;
-							}
-							break;
-						}
-
-						count_length++;
-
-						if (*it == ')') {
-							finished = true;
-						}
-					}
-
-					if(!finished) {
-						std::getline(infile, params);
-						toLowerCase(params);
-					}
-				}
-			}
-
-			// add single observation to the observation map
-			n = line.find(":observe ");
-			std::stringstream obs;
-			if (n != std::string::npos) {
- 				n = n + 9;
-				std::string observation = line.substr(n);
-				int count = 0;
-				int bracket_depth = 0;
-				int last_close = 0;
-				bool started = false;
-				while((!started || bracket_depth > 0) && !infile.eof()) {
-					for(std::string::iterator it = observation.begin(); it != observation.end(); ++it) {
-					    if (*it == '(') {
-							bracket_depth++;
-							started = true;
-						} else if (*it == ')') {
-							bracket_depth--;
-							if(bracket_depth>=0)
-								last_close = count;
-						}
-						count++;
-					}
-					
-					if(bracket_depth>=0) {
-						obs << observation;
-						std::getline(infile, observation);
-						toLowerCase(observation);
-					} else {
-						obs << observation.substr(0,last_close);
-					}
-				}
-
-				operator_observation_map[action_name] = obs.str();
-			}
-
-		}
-	}
-
-
-	/*-----------------------------------*/
-	/* parse conditions and observations */
-	/*-----------------------------------*/
-
-	/**
-	 * parse and ground a PDDL condition
-	 */
-	void CFFPlanParser::preparePDDLConditions(std::string operator_name, std::vector<std::string> parameters, StrlNode &node, PlanningEnvironment &environment) {
-	}
-
-	/**
-	 * parse and ground a PDDL observation
-	 */
-	void CFFPlanParser::preparePDDLObservation(std::string &operator_name, std::vector<std::string> &parameters, StrlEdge &edge, bool isNegative) {
-
-		// generate grounded observation
-		std::stringstream grounded_observation;
-		std::vector<std::string> observationParams;
-		split(operator_observation_map[operator_name], observationParams, ' ');
-
-		// for each parameter in observation
-		for(int i=0;i<observationParams.size();i++) {
-
-			// trim trailing bracket
-			bool hadBracket = false;
-			if(observationParams[i].find(")")!=std::string::npos) {
-				observationParams[i] = observationParams[i].substr(0,observationParams[i].find(")"));
-				hadBracket = true;
-			}
-
-			// find matching object in action parameters
-			bool found = false;
-			for(int j=0;j<operator_parameter_map[operator_name].size();j++) {
-				if(observationParams[i] == operator_parameter_map[operator_name][j]) {
-					grounded_observation << " " << parameters[j];
-					found = true;
-					break;
-				}
-			}
-			// string is not a parameter
-			if(!found)
-				grounded_observation << " " << observationParams[i];
-
-			if(hadBracket)
-				grounded_observation << ")";
-		}
-		
-		// update edges
-		edge.signal_type = CONDITION;
-		if(isNegative) {
-			std::stringstream negedge;
-			negedge << "(not " << grounded_observation.str() << ")";
-			edge.edge_name = negedge.str();
-		} else {
-			edge.edge_name = grounded_observation.str();
+			} 
+			knowledge_filter.push_back(filterItem);
 		}
 	}
 
-
-	/*----------------------------*/
-	/* Parse Contingent-FF output */
-	/*----------------------------*/
-
-	/**
-	 * Parse a plan written by CFF
-	 */
-	void CFFPlanParser::preparePlan(std::string &dataPath, PlanningEnvironment &environment, size_t freeActionID) {
-
-		ROS_INFO("KCL: (CFFPlanParser) Loading plan from file: %s. Initial action ID: %zu", ((dataPath + "plan.pddl").c_str()), freeActionID);
-		
-		// prepare plan
-		reset();
-		
-		// stack of branches
-		std::vector<StrlEdge*> branches;
-
-		// load plan file
-		std::ifstream infile((dataPath + "plan.pddl").c_str());
-		std::string line;
-		std::vector<std::string> s;
-		int curr ,next, nodeCount;
-		bool planFound = false;
-		bool planRead = false;
-		
-		nodeCount = freeActionID;
-		StrlEdge* last_edge = NULL;
-
-		while(!infile.eof()) {
-
-			std::getline(infile, line);
-			toLowerCase(line);
-
-			// loop until plan is printed
-			if(line.compare("ff: found plan as follows")==0) {
-				planFound = true;
-			}
-			if(!planFound) continue;
-
-			// skip dividers				
-			if(line.compare("-------------------------------------------------")==0) {
-				continue;
-			}
-
-			// parse action
-			if(line.find("---", 0) != std::string::npos) {
-
-				// actions look like this:
-				// "16||1", "---", "operator_name", "param1", ..., "---", "son:", "17||-1"
-				// "11||1", "---", "operator_name", "param1", ..., "---", "trueson:", "12||1", "---", "falseson:", "12||2"
-
-				split(line, s, ' ');
-				std::string operator_name = s[2];
-				std::string action_id = s[0];
-				if(cff_node_map.find(action_id)==cff_node_map.end()) {
-					cff_node_map[action_id] = new StrlNode();
-				}
-
-				StrlNode* node = cff_node_map[action_id];
-				createNode(s, operator_name, nodeCount, environment, *node);
-				++nodeCount;
-
-				// complete incoming edges
-				if(incoming_edge_map.find(action_id)!=incoming_edge_map.end()) {
-					for(int i=0;i<incoming_edge_map[action_id].size();i++) {
-						node->input.push_back(incoming_edge_map[action_id][i]);
-						incoming_edge_map[action_id][i]->sinks.push_back(node);
-					}
-				}
-
-				// collect parameters
-				std::vector<std::string> params;
-				int i=3;
-				while (i<s.size() && s[i]!="---") {
-					params.push_back(s[i]);
-					i++;
-				}
-
-				// prepare outgoing edges
-				if(s[s.size()-2].substr(0,4) == "son:") {
-
-					// single child
-					StrlEdge* edge = new StrlEdge();
-					createEdge(s[s.size()-1], *node, *edge);
-
-				} else if(s[s.size()-2].substr(0,9) == "falseson:") {
-
-					// two children of observation
-					StrlEdge* edge = new StrlEdge();
-					createEdge(s[s.size()-1], *node, *edge);
-					preparePDDLObservation(operator_name, params, *edge, true);
-
-					edge = new StrlEdge();
-					createEdge(s[s.size()-4], *node, *edge);
-					preparePDDLObservation(operator_name, params, *edge, false);
-				}
-			}
-		}
-
-		// printPlan(plan);
-		produceEsterel();
-		infile.close();
-	}
-
-
-	/*-----------------*/
-	/* Produce Esterel */
-	/*-----------------*/
-
-	/*
-	 * output a plan as an Esterel controller
-	 */
-	bool CFFPlanParser::produceEsterel() {
-		// nothing right now...
-	}
-	
-}} 
+}}
