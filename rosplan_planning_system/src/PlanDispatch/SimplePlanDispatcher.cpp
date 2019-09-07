@@ -70,7 +70,9 @@ namespace KCL_rosplan {
 
 			// loop while waiting for dispatch time
 			if(!dispatch_on_completion) {
+
 				double wait_period = 10.0;
+
 				int wait_print = (int)(currentMessage.dispatch_time + planStart - ros::WallTime::now().toSec()) / wait_period;
 				while (ros::ok() && ros::WallTime::now().toSec() < currentMessage.dispatch_time + planStart) {
 					ros::spinOnce();
@@ -219,23 +221,24 @@ namespace KCL_rosplan {
 	 */
 	void SimplePlanDispatcher::feedbackCallback(const rosplan_dispatch_msgs::ActionFeedback::ConstPtr& msg) {
 
-		// create error if the action is unrecognised
 		ROS_INFO("KCL: (PS)(SPD) Feedback received [%i, %s]", msg->action_id, msg->status.c_str());
+        
+        // create error if the action is unrecognised		
 		if(current_action != (unsigned int)msg->action_id)
 			ROS_ERROR("KCL: (PS)(SPD) Unexpected action ID: %d; current action: %zu", msg->action_id, current_action);
 
-		// action enabled
+        // action enabled
 		if(!action_received[msg->action_id] && (0 == msg->status.compare("action enabled")))
 			action_received[msg->action_id] = true;
 		
-		// more specific feedback
+        // more specific feedback
 		actionFeedback(msg);
 
-		// action completed (successfuly)
+        // action completed (successfuly)
 		if(!action_completed[msg->action_id] && 0 == msg->status.compare("action achieved"))
 			action_completed[msg->action_id] = true;
 
-		// action completed (failed)
+        // action completed (failed)
 		if(!action_completed[msg->action_id] && 0 == msg->status.compare("action failed")) {
 			replan_requested = true;
 			action_completed[msg->action_id] = true;

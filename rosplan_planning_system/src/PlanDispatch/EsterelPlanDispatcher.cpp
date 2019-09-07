@@ -35,7 +35,6 @@ namespace KCL_rosplan {
 		query_knowledge_client = nh.serviceClient<rosplan_knowledge_msgs::KnowledgeQueryService>("/kcl_rosplan/query_knowledge_base");
 		plan_graph_publisher = nh.advertise<std_msgs::String>("/kcl_rosplan/plan_graph", 1000, true);
 	}
-
 	
 	EsterelPlanDispatcher::EsterelPlanDispatcher(cff_esterel::CFFPlanParser &parser)
 		: action_id_offset(0)

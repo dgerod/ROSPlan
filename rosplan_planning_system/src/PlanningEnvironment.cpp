@@ -34,7 +34,6 @@ namespace KCL_rosplan {
 		std::string domainFileName = (domainPath);
 		ROS_INFO("KCL: (PS)(PE) Parsing domain: %s.", domainFileName.c_str());
 
-		
 		// save filename for VAL
 		std::vector<char> writable(domainFileName.begin(), domainFileName.end());
 		writable.push_back('\0');
