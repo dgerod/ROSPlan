@@ -13,11 +13,11 @@ namespace KCL_rosplan {
 	void DomainParser::parseDomain(const std::string domainPath) {
 		
 		// only parse domain once
-		if(domain_parsed) return;
+		if(domain_parsed) { return;	}
 		domain_parsed = true;
 
 		std::string domainFileName = (domainPath);
-		ROS_INFO("KCL: (KB) Parsing domain: %s.", domainFileName.c_str());
+		ROS_INFO("KCL: (KB)(DP) Parsing domain: %s.", domainFileName.c_str());
 
 		// save filename for VAL
 		std::vector<char> writable(domainFileName.begin(), domainFileName.end());
@@ -27,9 +27,9 @@ namespace KCL_rosplan {
 		// parse domain
 		VAL::current_analysis = val_analysis = &VAL::an_analysis;
 		std::ifstream domainFile;
+
 		domainFile.open(domainFileName.c_str());
 		yydebug = 0;
-
 		VAL::yfl = new yyFlexLexer;
 
 		if (domainFile.bad()) {
@@ -37,15 +37,26 @@ namespace KCL_rosplan {
 			line_no = 0;
 			VAL::log_error(VAL::E_FATAL,"Failed to open file");
 		} else {
+
 			line_no = 1;
+
 			VAL::yfl->switch_streams(&domainFile, &std::cout);
 			yyparse();
 
-			// domain name
 			domain = VAL::current_analysis->the_domain;
-			domain_name = domain->name;
+			if (domain == NULL)
+			{
+			    ROS_ERROR("KCL: (KB) Failed to load the domain.");
+    			line_no = 0;
+			    VAL::log_error(VAL::E_FATAL,"Failed to open file");
+			} else {
+			    domain_name = domain->name;
+			}
 		}
+
 		delete VAL::yfl;
 		domainFile.close();
+
+        ROS_INFO("KCL: (KB)(DP) Parse completed.");
 	}
 } // close namespace
