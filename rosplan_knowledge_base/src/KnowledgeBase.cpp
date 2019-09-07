@@ -15,6 +15,8 @@ namespace KCL_rosplan {
 			bool present = false;
 			if(iit->knowledge_type == rosplan_knowledge_msgs::KnowledgeItem::INSTANCE) {
 
+                ROS_INFO("KCL: (KB)(QK) Instance: [%d][%s]", iit->is_negative, iit->attribute_name.c_str());
+                    
 				// check if instance exists
 				std::vector<std::string>::iterator sit;
 				sit = find(model_instances[iit->instance_type].begin(), model_instances[iit->instance_type].end(), iit->instance_name);
@@ -22,6 +24,8 @@ namespace KCL_rosplan {
 				
 			} else if(iit->knowledge_type == rosplan_knowledge_msgs::KnowledgeItem::FUNCTION) {
 
+                ROS_INFO("KCL: (KB)(QK) Function:  [%d][%s]", iit->is_negative, iit->attribute_name.c_str());
+                    
 				// check if function exists; TODO inequalities
 				std::vector<rosplan_knowledge_msgs::KnowledgeItem>::iterator pit;
 				for(pit=model_functions.begin(); pit!=model_functions.end(); pit++) {
@@ -35,6 +39,9 @@ namespace KCL_rosplan {
 				// check if fact is true
 				std::vector<rosplan_knowledge_msgs::KnowledgeItem>::iterator pit;
 				for(pit=model_facts.begin(); pit!=model_facts.end(); pit++) {
+                    
+                    ROS_INFO("KCL: (KB)(QK) Fact:  [%d][%s]", pit->is_negative, pit->attribute_name.c_str());
+                     
 					if(KnowledgeComparitor::containsKnowledge(*iit, *pit)) {
 						present = true;
 						break;
@@ -255,9 +262,16 @@ namespace KCL_rosplan {
 					return;
 				}
 			}
-			ROS_INFO("KCL: (KB) Adding domain attribute (%s%s)",
-			         msg.attribute_name.c_str(), param_str.c_str());
-			model_facts.push_back(msg);
+			
+			if(!msg.is_negative) {
+                ROS_INFO("KCL: (KB) Adding domain attribute (%s%s)",
+                        msg.attribute_name.c_str(), param_str.c_str());
+            } else {
+                ROS_INFO("KCL: (KB) Adding domain attribute (not (%s%s))",
+                        msg.attribute_name.c_str(), param_str.c_str());
+            }
+            
+            model_facts.push_back(msg);
 			plan_filter.checkFilters(msg, true);
 
 		} else if(msg.knowledge_type == rosplan_knowledge_msgs::KnowledgeItem::FUNCTION) {
@@ -297,8 +311,14 @@ namespace KCL_rosplan {
 			}
 		}
 		
-		ROS_INFO("KCL: (KB) Adding mission goal (%s%s)",
-		         msg.attribute_name.c_str(), param_str.c_str());
+		if(!msg.is_negative) {
+                ROS_INFO("KCL: (KB) Adding mission goal (%s%s)",
+                        msg.attribute_name.c_str(), param_str.c_str());
+            } else {
+                ROS_INFO("KCL: (KB) Adding mission goal (not (%s%s))",
+                        msg.attribute_name.c_str(), param_str.c_str());
+            }
+        
 		model_goals.push_back(msg);
 	}
 
@@ -308,6 +328,8 @@ namespace KCL_rosplan {
 
 	bool KnowledgeBase::getCurrentInstances(rosplan_knowledge_msgs::GetInstanceService::Request  &req, rosplan_knowledge_msgs::GetInstanceService::Response &res) {
 	
+        ROS_DEBUG("KCL: (KB)(getCurrentInstances)");
+        
 		// fetch the instances of the correct type
 		if(""==req.type_name) {
 			std::map<std::string,std::vector<std::string> >::iterator iit;
@@ -329,6 +351,8 @@ namespace KCL_rosplan {
 
 	bool KnowledgeBase::getCurrentKnowledge(rosplan_knowledge_msgs::GetAttributeService::Request  &req, rosplan_knowledge_msgs::GetAttributeService::Response &res) {
 
+        ROS_DEBUG("KCL: (KB)(getCurrentKnowledge)");
+        
 		// fetch the knowledgeItems of the correct attribute
 		for(size_t i=0; i<model_facts.size(); i++) {
 			if(0==req.predicate_name.compare(model_facts[i].attribute_name) || ""==req.predicate_name)
@@ -493,12 +517,13 @@ int main(int argc, char **argv)
 	n.param("use_unknowns", useUnknowns, false);
 
 	KCL_rosplan::KnowledgeBase kb;
+
 	ROS_INFO("KCL: (KB) Parsing domain");
 	kb.domain_parser.domain_parsed = false;
 	kb.domain_parser.parseDomain(domainPath);
 	kb.use_unknowns = useUnknowns;
 
-	// fetch domain info
+	ROS_INFO("KCL: (KB) Start fetch domain info services");
 	ros::ServiceServer typeServer = n.advertiseService("/kcl_rosplan/get_domain_types", &KCL_rosplan::KnowledgeBase::getTypes, &kb);
 	ros::ServiceServer predicateServer = n.advertiseService("/kcl_rosplan/get_domain_predicates", &KCL_rosplan::KnowledgeBase::getPredicates, &kb);
 	ros::ServiceServer functionServer = n.advertiseService("/kcl_rosplan/get_domain_functions", &KCL_rosplan::KnowledgeBase::getFunctions, &kb);
@@ -507,29 +532,32 @@ int main(int argc, char **argv)
 	ros::ServiceServer opDetailsServer = n.advertiseService("/kcl_rosplan/get_domain_operator_details", &KCL_rosplan::KnowledgeBase::getOperatorDetails, &kb);
 	ros::ServiceServer predDetailsServer = n.advertiseService("/kcl_rosplan/get_domain_predicate_details", &KCL_rosplan::KnowledgeBase::getPredicateDetails, &kb);
 
-	// query knowledge
+	ROS_INFO("KCL: (KB) Start query knowledge services");
 	ros::ServiceServer queryServer = n.advertiseService("/kcl_rosplan/query_knowledge_base", &KCL_rosplan::KnowledgeBase::queryKnowledge, &kb);
 
-	// update knowledge
+	ROS_INFO("KCL: (KB) Start update knowledge services");
 	ros::ServiceServer updateServer1 = n.advertiseService("/kcl_rosplan/update_knowledge_base", &KCL_rosplan::KnowledgeBase::updateKnowledge, &kb);
 	ros::ServiceServer updateServer2 = n.advertiseService("/kcl_rosplan/update_knowledge_base_array", &KCL_rosplan::KnowledgeBase::updateKnowledgeArray, &kb);
 	ros::ServiceServer updateServer3 = n.advertiseService("/kcl_rosplan/update_knowledge_base_constraints_oneof", &KCL_rosplan::KnowledgeBase::updateKnowledgeConstraintsOneOf, &kb);
 	ros::ServiceServer clearServer = n.advertiseService("/kcl_rosplan/clear_knowledge_base", &KCL_rosplan::KnowledgeBase::clearKnowledge, &kb);
 
-	// fetch knowledge
+	ROS_INFO("KCL: (KB) Start Fetch knowledge services");
 	ros::ServiceServer currentInstanceServer = n.advertiseService("/kcl_rosplan/get_current_instances", &KCL_rosplan::KnowledgeBase::getCurrentInstances, &kb);
 	ros::ServiceServer currentKnowledgeServer = n.advertiseService("/kcl_rosplan/get_current_knowledge", &KCL_rosplan::KnowledgeBase::getCurrentKnowledge, &kb);
 	ros::ServiceServer currentGoalServer = n.advertiseService("/kcl_rosplan/get_current_goals", &KCL_rosplan::KnowledgeBase::getCurrentGoals, &kb);
 
-	// planning and mission filter
+	ROS_INFO("KCL: (KB) Start planning and mission filter publisher and services");
 	kb.plan_filter.notification_publisher = n.advertise<rosplan_knowledge_msgs::Notification>("/kcl_rosplan/notification", 10, true);
 	ros::Subscriber planningFilterSub = n.subscribe("/kcl_rosplan/plan_filter", 100, &KCL_rosplan::PlanFilter::planningFilterCallback, &kb.plan_filter);
 	ros::Subscriber missionFilterSub = n.subscribe("/kcl_rosplan/plan_filter", 100, &KCL_rosplan::PlanFilter::missionFilterCallback, &kb.plan_filter);
 
 	// wait for and clear mongoDB 
-	ROS_INFO("KCL: (KB) Waiting for MongoDB");
-	ros::service::waitForService("/message_store/delete",-1);
-	system("mongo message_store --eval \"printjson(db.message_store.remove())\"");
+	//ROS_INFO("KCL: (KB) Waiting for MessageStore at MongoDB");
+	//ros::service::waitForService("/message_store/delete",-1);
+    //ROS_INFO("KCL: (KB) Cleaning data in MessageStore at MongoDB");
+	//system("mongo message_store --eval \"printjson(db.message_store.remove({}))\"");
+
+    // wait until SceneDB is up...
 
 	ROS_INFO("KCL: (KB) Ready to receive");
 	ros::spin();
