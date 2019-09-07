@@ -84,12 +84,9 @@ namespace KCL_rosplan {
             it->second.dispatcher->action_feedback_pub = action_feedback_pub;
         }
         
-        // publishing plan and problem
         plan_publisher = nh.advertise<rosplan_dispatch_msgs::CompletePlan>("/kcl_rosplan/plan", 5, true);
         problem_publisher = nh.advertise<std_msgs::String>("/kcl_rosplan/problem", 5, true);        
-        // publishing system_state
         state_publisher = nh.advertise<std_msgs::String>("/kcl_rosplan/system_state", 5, true);  
-        // problem generation client
         generate_problem_client = nh.serviceClient<rosplan_knowledge_msgs::GenerateProblemService>("/kcl_rosplan/generate_planning_problem");
 
         // set default parser and dispatcher and start planning action server
@@ -202,8 +199,7 @@ namespace KCL_rosplan {
 	 */
 	void PlanningSystem::notificationCallBack(const rosplan_knowledge_msgs::Notification::ConstPtr& msg) {
 		ROS_INFO("KCL: (PS) (%s) Notification received; plan invalidated; replanning.", problem_name.c_str());
-		plan_dispatcher->replan_requested = true;
-		
+		plan_dispatcher->replan_requested = true;		
 	}
 
 	/**
@@ -290,12 +286,8 @@ namespace KCL_rosplan {
     void PlanningSystem::actionFeedbackCallback(const rosplan_dispatch_msgs::ActionFeedback::ConstPtr& msg)
     {
         ROS_INFO("KCL: (PS) Forward message to Planner Dispatcher");
-        std::map<std::string, PlannerInfo>::iterator it;
-        for(it = planner_list.begin(); it != planner_list.end(); it++) {
-            it->second.dispatcher->feedbackCallback(msg);
-        }        
+        plan_dispatcher->feedbackCallback(msg);
     }
-                
         
 	/* planning system service method; loads parameters and calls method below */
 	bool PlanningSystem::runPlanningServerDefault(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
