@@ -59,6 +59,67 @@ namespace KCL_rosplan {
         pFile << ")" << std::endl;
     }
 
+     void PDDLProblemGenerator::makeFooter(std::ofstream &pFile) {
+        pFile << ")" << std::endl;
+     }
+       
+    bool PDDLProblemGenerator::preparePredicateParameters(DomainFormulas &domainFormulas,
+                                                          rosplan_knowledge_msgs::KnowledgeItem &kwItem,
+                                                          std::ofstream &pFile) {
+        
+        class Condition 
+        {
+        public:
+            Condition(std::string attributeName)
+                : _attributeName(attributeName) {                            
+            }
+            
+            bool operator()(rosplan_knowledge_msgs::DomainFormula domainFormula) const {
+                return domainFormula.name == _attributeName;
+            }
+            
+        protected:
+            std::string _attributeName;
+        };
+                
+        bool success = true;
+        DomainFormulas::iterator domainIterator;
+        domainIterator = std::find_if(domainFormulas.begin(), domainFormulas.end(), Condition(kwItem.attribute_name));
+
+        if(domainIterator != domainFormulas.end()) {                        
+            ROS_DEBUG("KCL: (PDDLProblemGenerator) Goal (%s) found in domain", kwItem.attribute_name.c_str());
+            ROS_DEBUG("KCL: (PDDLProblemGenerator) Goal Parameters - Num: %zu", kwItem.values.size());
+            ROS_DEBUG("KCL: (PDDLProblemGenerator) Domain Parameters - Num: %zu", domainIterator->typed_parameters.size());
+            
+            for(size_t j = 0; j < domainIterator->typed_parameters.size(); ++j) {
+                
+                ROS_DEBUG("KCL: (PDDLProblemGenerator) Domain param (%s)", domainIterator->typed_parameters[j].key.c_str());
+                
+                bool parameterExistsInDomain = false;                                
+                for(size_t k = 0; k < kwItem.values.size(); ++k) {
+                    
+                    if(0 == kwItem.values[k].key.compare(domainIterator->typed_parameters[j].key)) {
+                        ROS_DEBUG("KCL: (PDDLProblemGenerator) Goal param (%s) FOUND in domain (%s)", 
+                                    kwItem.values[k].key.c_str(), domainIterator->typed_parameters[j].key.c_str());                                
+                        pFile << " " << kwItem.values[k].value;
+                        parameterExistsInDomain = true;
+                        break;
+                    } else {
+                        ROS_DEBUG("KCL: (PDDLProblemGenerator) Goal param (%s) not found in domain (%s)", 
+                                    kwItem.values[k].key.c_str(), domainIterator->typed_parameters[j].key.c_str());                        
+                    }
+                }
+                
+                success = success && parameterExistsInDomain;
+            }
+        }
+        
+        ROS_INFO("KCL: (PDDLProblemGenerator) Is goal (%s) found in domain? %d", kwItem.attribute_name.c_str(),
+            success);
+        
+        return success;
+    }
+
     /*---------------*/
     /* initial state */
     /*---------------*/
@@ -210,9 +271,11 @@ namespace KCL_rosplan {
     /*------*/
     /* goal */
     /*------*/
-
-    void PDDLProblemGenerator::makeGoals(std::ofstream &pFile) {
-            
+    
+    bool PDDLProblemGenerator::makeGoals(std::ofstream &pFile) {
+        
+        bool success = true;
+        
         ros::NodeHandle nh;
         ros::ServiceClient getCurrentGoalsClient = nh.serviceClient<rosplan_knowledge_msgs::GetAttributeService>(state_goal_service);
         ros::ServiceClient getDomainPropsClient = nh.serviceClient<rosplan_knowledge_msgs::GetDomainAttributeService>(domain_predicate_service);
@@ -241,6 +304,7 @@ namespace KCL_rosplan {
                         pFile << "    (" + goalAttributes[i].attribute_name;                        
                     }
                     
+                    /*
                     class Condition 
                     {
                     public:
@@ -280,9 +344,17 @@ namespace KCL_rosplan {
                     }
                     else {                                            
                         ROS_ERROR("KCL: (PDDLProblemGenerator) Goal (%s) NOT found in domain", goalAttributes[i].attribute_name.c_str());
+                        success = false;
+                        break;
                     }
+                    */
                     
-                    if(goalAttributes[i].is_negative){
+                    if (!preparePredicateParameters(domainAttributes, goalAttributes[i], pFile)) {
+                        success = false;
+                        break;
+                    }
+                        
+                    if(goalAttributes[i].is_negative) {
                         pFile << "))";                        
                     } else {
                         pFile << ")";                        
@@ -317,12 +389,14 @@ namespace KCL_rosplan {
                     pFile << std::endl;
                 }
             }
-        } else {
+        } else {            
             ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s or service %s", 
                       state_goal_service.c_str(), domain_predicate_service.c_str());
+            success = false;
         }
         
         pFile << "))" << std::endl;
+        return success;
     }
 
     /*--------*/
@@ -419,13 +493,14 @@ namespace KCL_rosplan {
     }
 
     void PDDLProblemGenerator::makeProblem(std::ofstream &pFile) {
+        
+        bool success = true;
+        
         makeHeader(pFile);
         makeInitialState(pFile);
-        makeGoals(pFile);
+        success = success && makeGoals(pFile);
         makeMetric(pFile);
-
-        // add end of problem file
-        pFile << ")" << std::endl;
+        makeFooter(pFile);
     };
 
 } // close namespace
