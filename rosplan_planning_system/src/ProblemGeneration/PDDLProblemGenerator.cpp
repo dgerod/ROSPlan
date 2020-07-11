@@ -7,56 +7,71 @@ namespace KCL_rosplan {
         : ProblemGenerator(kb) {            
     };
     
-    /*--------*/
-    /* header */
-    /*--------*/
+    bool PDDLProblemGenerator::writeDomainName(std::ofstream &pFile) {
 
-    void PDDLProblemGenerator::makeHeader(std::ofstream &pFile) {
-
-        // setup service calls
+        bool success = true;
+        
         ros::NodeHandle nh;
-
         ros::ServiceClient getNameClient = nh.serviceClient<rosplan_knowledge_msgs::GetDomainNameService>(domain_name_service);
+        rosplan_knowledge_msgs::GetDomainNameService nameSrv;
+        
+        if (getNameClient.call(nameSrv)) {
+           pFile << "(define (problem task)" << std::endl;
+           pFile << "(:domain " << nameSrv.response.domain_name << ")" << std::endl;
+        } else {
+            ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s", domain_name_service.c_str());
+            success = false;
+        }
+        
+        return success;
+    }
+        
+    bool PDDLProblemGenerator::writeObjects(std::ofstream &pFile) {
+
+        bool success = true;
+        
+        ros::NodeHandle nh;
         ros::ServiceClient getTypesClient = nh.serviceClient<rosplan_knowledge_msgs::GetDomainTypeService>(domain_type_service);
         ros::ServiceClient getInstancesClient = nh.serviceClient<rosplan_knowledge_msgs::GetInstanceService>(state_instance_service);
-
-        // get domain name
-        rosplan_knowledge_msgs::GetDomainNameService nameSrv;
-        if (!getNameClient.call(nameSrv)) {
-            ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s", domain_name_service.c_str());
-        }
-
-        pFile << "(define (problem task)" << std::endl;
-        pFile << "(:domain " << nameSrv.response.domain_name << ")" << std::endl;
-
-        /* objects */
-        pFile << "(:objects" << std::endl;
-
-        // get types
         rosplan_knowledge_msgs::GetDomainTypeService typeSrv;
-        if (!getTypesClient.call(typeSrv)) {
-            ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s", domain_type_service.c_str());
-        }
 
-        // get instances of each type
-        for(size_t t=0; t<typeSrv.response.types.size(); t++) {
+        if (getTypesClient.call(typeSrv)) {
 
-            rosplan_knowledge_msgs::GetInstanceService instanceSrv;
-            instanceSrv.request.type_name = typeSrv.response.types[t];
+            pFile << "(:objects" << std::endl;
+            
+            for(size_t t=0; t<typeSrv.response.types.size(); t++) {
 
-            if (!getInstancesClient.call(instanceSrv)) {
-                ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s: %s", state_instance_service.c_str(), instanceSrv.request.type_name.c_str());
-            } else {
-                if(instanceSrv.response.instances.size() == 0) continue;
-                pFile << "    ";
-                for(size_t i=0;i<instanceSrv.response.instances.size();i++) {
-                    pFile << instanceSrv.response.instances[i] << " ";
+                rosplan_knowledge_msgs::GetInstanceService instanceSrv;
+                instanceSrv.request.type_name = typeSrv.response.types[t];
+
+                if (!getInstancesClient.call(instanceSrv)) {
+                    ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s: %s", state_instance_service.c_str(), instanceSrv.request.type_name.c_str());
+                } else {
+                    if(instanceSrv.response.instances.size() == 0) continue;
+                    pFile << "    ";
+                    for(size_t i=0;i<instanceSrv.response.instances.size();i++) {
+                        pFile << instanceSrv.response.instances[i] << " ";
+                    }
+                    pFile << "- " << typeSrv.response.types[t] << std::endl;
                 }
-                pFile << "- " << typeSrv.response.types[t] << std::endl;
-            }
-        }
+            }       
+            pFile << ")" << std::endl;
 
-        pFile << ")" << std::endl;
+        } else {
+            ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s", domain_type_service.c_str());
+            success = false;
+        }
+        
+        return success;
+    }
+    
+    bool PDDLProblemGenerator::makeHeader(std::ofstream &pFile) {
+        
+        bool success = true;        
+        success = success && writeDomainName(pFile);
+        success = success && writeObjects(pFile);        
+        
+        return success;
     }
 
      void PDDLProblemGenerator::makeFooter(std::ofstream &pFile) {
@@ -307,10 +322,6 @@ namespace KCL_rosplan {
         
         return success;
     }
-
-    /*------*/
-    /* goal */
-    /*------*/
     
     bool PDDLProblemGenerator::makeGoals(std::ofstream &pFile) {
         
@@ -394,10 +405,6 @@ namespace KCL_rosplan {
 
         return success;
     }
-
-    /*--------*/
-    /* metric */
-    /*--------*/
 
     void PDDLProblemGenerator::makeMetric(std::ofstream &pFile) {
 
@@ -490,13 +497,12 @@ namespace KCL_rosplan {
 
     void PDDLProblemGenerator::makeProblem(std::ofstream &pFile) {
         
-        bool success = true;
-        
-        makeHeader(pFile);
+        bool success = true;        
+        success = success && makeHeader(pFile);
         success = success && makeInitialState(pFile);
         success = success && makeGoals(pFile);
         makeMetric(pFile);
         makeFooter(pFile);
     };
 
-} // close namespace
+}

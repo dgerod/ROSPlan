@@ -18,11 +18,14 @@ namespace KCL_rosplan {
         bool preparePredicateParameters(DomainFormulas &domainFormulas, 
                                         rosplan_knowledge_msgs::KnowledgeItem &kwItem,
                                         std::ofstream &pFile);
+        
+        bool writeDomainName(std::ofstream &pFile);
+        bool writeObjects(std::ofstream &pFile);        
         bool getPropositions(ros::Time &time, std::ofstream &pFile);
         void getFunctions(ros::Time &time, std::ofstream &pFile);
         void printExpression(std::ofstream &pFile, rosplan_knowledge_msgs::ExprComposite &e);
      
-        void makeHeader(std::ofstream &pFile);
+        bool makeHeader(std::ofstream &pFile);
         bool makeInitialState(std::ofstream &pFile);
         bool makeGoals(std::ofstream &pFile);
         void makeMetric(std::ofstream &pFile);
