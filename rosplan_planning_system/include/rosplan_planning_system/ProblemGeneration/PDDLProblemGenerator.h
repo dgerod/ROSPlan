@@ -22,7 +22,7 @@ namespace KCL_rosplan {
         bool writeDomainName(std::ofstream &pFile);
         bool writeObjects(std::ofstream &pFile);        
         bool getPropositions(ros::Time &time, std::ofstream &pFile);
-        void getFunctions(ros::Time &time, std::ofstream &pFile);
+        bool getFunctions(ros::Time &time, std::ofstream &pFile);
         void printExpression(std::ofstream &pFile, rosplan_knowledge_msgs::ExprComposite &e);
      
         bool makeHeader(std::ofstream &pFile);

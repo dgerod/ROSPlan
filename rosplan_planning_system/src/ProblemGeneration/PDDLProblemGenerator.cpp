@@ -169,7 +169,7 @@ namespace KCL_rosplan {
 
                     std::vector<rosplan_knowledge_msgs::KnowledgeItem> attributes = attrSrv.response.attributes;
                     
-                    for(size_t i=0;i<attributes.size();i++) {
+                    for(size_t i = 0; i < attributes.size(); ++i) {
 
                         if(attributes[i].is_negative) {
                             pFile << "    (not (";
@@ -177,14 +177,7 @@ namespace KCL_rosplan {
                         else {
                             pFile << "    (";
                         }
-                        
                         pFile << attributes[i].attribute_name;
-                        
-                        /*
-                        for(size_t j=0; j<attributes[i].values.size(); j++) {
-                            pFile << " " << attributes[i].values[j].value;
-                        }
-                        */
                                        
                         if (!preparePredicateParameters(domainAttributes, attributes[i], pFile)) {
                             success = false;
@@ -218,7 +211,7 @@ namespace KCL_rosplan {
 
                     std::vector<rosplan_knowledge_msgs::KnowledgeItem> attributes = attrSrv.response.attributes;
                     
-                    for(size_t i=0;i<attributes.size();i++) {
+                    for(size_t i = 0; i < attributes.size(); ++i) {
 
                         if(attributes[i].is_negative) {
                             pFile << "    (at " << (attributes[i].initial_time - time).toSec() << " (not (";                            
@@ -226,14 +219,7 @@ namespace KCL_rosplan {
                         else {
                             pFile << "    (at " << (attributes[i].initial_time - time).toSec() << " (";                            
                         }
-                                                
                         pFile << attributes[i].attribute_name;
-                        
-                        /*
-                        for(size_t j=0; j<attributes[i].values.size(); j++) {
-                            pFile << " " << attributes[i].values[j].value;
-                        }
-                        */
                         
                         if (!preparePredicateParameters(domainAttributes, attributes[i], pFile)) {
                             success = false;
@@ -259,46 +245,56 @@ namespace KCL_rosplan {
         return success;
     }
    
-   void PDDLProblemGenerator::getFunctions(ros::Time &time, std::ofstream &pFile) {
+   bool PDDLProblemGenerator::getFunctions(ros::Time &time, std::ofstream &pFile) {
     
-        ros::NodeHandle nh;
-        ros::ServiceClient getDomainFuncsClient = nh.serviceClient<rosplan_knowledge_msgs::GetDomainAttributeService>(domain_function_service);
-        ros::ServiceClient getFuncsClient = nh.serviceClient<rosplan_knowledge_msgs::GetAttributeService>(state_function_service);
+        bool success = true;
         
+        ros::NodeHandle nh;
+        ros::ServiceClient getDomainPropsClient = nh.serviceClient<rosplan_knowledge_msgs::GetDomainAttributeService>(domain_predicate_service);
+        ros::ServiceClient getDomainFuncsClient = nh.serviceClient<rosplan_knowledge_msgs::GetDomainAttributeService>(domain_function_service);
+        ros::ServiceClient getFuncsClient = nh.serviceClient<rosplan_knowledge_msgs::GetAttributeService>(state_function_service);        
         rosplan_knowledge_msgs::GetDomainAttributeService domainAttrSrv;
-        if (!getDomainFuncsClient.call(domainAttrSrv)) {
-            ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s", domain_function_service.c_str());
-        } else {
+        
+        if (getDomainFuncsClient.call(domainAttrSrv)) {
 
-            std::vector<rosplan_knowledge_msgs::DomainFormula>::iterator ait = domainAttrSrv.response.items.begin();
-            for(; ait != domainAttrSrv.response.items.end(); ait++) {
+            std::vector<rosplan_knowledge_msgs::DomainFormula> domainAttributes = domainAttrSrv.response.items;            
+            std::vector<rosplan_knowledge_msgs::DomainFormula>::iterator domainIterator = domainAttributes.begin();
+        
+            for(; domainIterator != domainAttrSrv.response.items.end(); ++domainIterator) {
 
                 rosplan_knowledge_msgs::GetAttributeService attrSrv;
-                attrSrv.request.predicate_name = ait->name;
+                attrSrv.request.predicate_name = domainIterator->name;
+                
                 if (!getFuncsClient.call(attrSrv)) {
-                    ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s: %s", state_function_service.c_str(), attrSrv.request.predicate_name.c_str());
+                    ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s: %s", 
+                              state_function_service.c_str(), attrSrv.request.predicate_name.c_str());
+                    success = false;
+                    break;
                 } else {
+                    
+                    std::vector<rosplan_knowledge_msgs::KnowledgeItem> attributes = attrSrv.response.attributes;
 
-                    for(size_t i=0;i<attrSrv.response.attributes.size();i++) {
-
-                        rosplan_knowledge_msgs::KnowledgeItem attr = attrSrv.response.attributes[i];
+                    for(size_t i = 0; i < attributes.size(); ++i) {
 
                         pFile << "    (";
-
-                        if(time < attr.initial_time) {
-                            pFile << "at " << (attr.initial_time - time).toSec() << " (";
+                        if(time < attributes[i].initial_time) {
+                            pFile << "at " << (attributes[i].initial_time - time).toSec() << " (";
                         }
-
-                        pFile << "= (";
-
-                        pFile << attr.attribute_name;
+                        pFile << "= (" << attributes[i].attribute_name;
+                        
+                        /*
                         for(size_t j=0; j<attr.values.size(); j++) {
                             pFile << " " << attr.values[j].value;
                         }
+                        */
+                        
+                         if (!preparePredicateParameters(domainAttributes, attributes[i], pFile)) {
+                            success = false;
+                            break;
+                        }
 
-                        pFile << ") " << attr.function_value << ")";
-
-                        if(time < attr.initial_time) {
+                        pFile << ") " << attributes[i].function_value << ")";
+                        if(time < attributes[i].initial_time) {
                             pFile << ")";
                         }
 
@@ -307,17 +303,22 @@ namespace KCL_rosplan {
                 }
                 pFile << std::endl;
             }
+        } else {
+            ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s", domain_function_service.c_str());
+            success = false;
         }
+        
+        return success;
     }
 
     bool PDDLProblemGenerator::makeInitialState(std::ofstream &pFile) {
 
-        bool success = true;
-        
+        bool success = true;        
         ros::Time time = ros::Time::now() + ros::Duration(1);        
+        
         pFile << "(:init" << std::endl;
         success = success && getPropositions(time, pFile);
-        getFunctions(time, pFile);        
+        success = success && getFunctions(time, pFile);        
         pFile << ")" << std::endl;
         
         return success;
@@ -414,7 +415,6 @@ namespace KCL_rosplan {
         ros::ServiceClient getCurrentMetricClient = nh.serviceClient<rosplan_knowledge_msgs::GetMetricService>(state_metric_service);
         rosplan_knowledge_msgs::GetMetricService currentMetricSrv;
         if (!getCurrentMetricClient.call(currentMetricSrv)) {
-
             ROS_ERROR("KCL: (PDDLProblemGenerator) Failed to call service %s", state_metric_service.c_str());
 
         } else {
