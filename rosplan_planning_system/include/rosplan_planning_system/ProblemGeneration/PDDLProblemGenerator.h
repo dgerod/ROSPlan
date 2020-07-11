@@ -15,20 +15,18 @@ namespace KCL_rosplan {
     private:        
         typedef std::vector<rosplan_knowledge_msgs::DomainFormula> DomainFormulas;
         
-        bool preparePredicateParameters(DomainFormulas &domainFormulas, 
-                                        rosplan_knowledge_msgs::KnowledgeItem &kwItem,
-                                        std::ofstream &pFile);
-        
-        bool writeDomainName(std::ofstream &pFile);
-        bool writeObjects(std::ofstream &pFile);        
-        bool getPropositions(ros::Time &time, std::ofstream &pFile);
-        bool getFunctions(ros::Time &time, std::ofstream &pFile);
+        bool printDomainName(std::ofstream &pFile);
+        bool printObjects(std::ofstream &pFile);        
+        bool printPredicateParameters(DomainFormulas &domainFormulas, 
+                                      rosplan_knowledge_msgs::KnowledgeItem &kwItem, std::ofstream &pFile);
+        bool printPropositions(ros::Time &time, std::ofstream &pFile);
+        bool printFunctions(ros::Time &time, std::ofstream &pFile);
         void printExpression(std::ofstream &pFile, rosplan_knowledge_msgs::ExprComposite &e);
      
         bool makeHeader(std::ofstream &pFile);
         bool makeInitialState(std::ofstream &pFile);
         bool makeGoals(std::ofstream &pFile);
-        void makeMetric(std::ofstream &pFile);
+        bool makeMetric(std::ofstream &pFile);
         void makeFooter(std::ofstream &pFile);
         
         void makeProblem(std::ofstream &pFile);
@@ -36,6 +34,6 @@ namespace KCL_rosplan {
     public:
         PDDLProblemGenerator(const std::string& kb);
     };
-} // close namespace
+}
 
 #endif
